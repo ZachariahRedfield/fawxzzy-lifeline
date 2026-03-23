@@ -1,0 +1,19 @@
+name: fitness-app
+archetype: next-web
+repo: git@github.com:fawxzzy/fitness-app.git
+branch: main
+projectPath: apps/web
+installCommand: pnpm install --frozen-lockfile
+buildCommand: pnpm build
+startCommand: pnpm start
+port: 3000
+healthcheckPath: /api/health
+env:
+  mode: file
+  file: .env.production
+  required:
+    - DATABASE_URL
+    - SESSION_SECRET
+deploy:
+  strategy: rebuild
+  workingDirectory: /srv/fitness-app

@@ -1,0 +1,30 @@
+{
+  "name": "fawxzzy-lifeline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lifeline v1 manifest validation CLI for Fawxzzy apps.",
+  "type": "module",
+  "packageManager": "pnpm@10.6.5",
+  "engines": {
+    "node": ">=22.14.0 <23"
+  },
+  "bin": {
+    "lifeline": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "biome check .",
+    "format": "biome format --write .",
+    "validate:fitness": "node dist/cli.js validate examples/fitness-app.lifeline.yml",
+    "validate:playbook": "node dist/cli.js validate examples/playbook-ui.lifeline.yml",
+    "lifeline": "node dist/cli.js"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "typescript": "5.8.2"
+  }
+}
