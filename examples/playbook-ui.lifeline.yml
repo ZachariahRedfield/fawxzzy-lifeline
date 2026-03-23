@@ -10,7 +10,7 @@ healthcheckPath: /api/health
 env:
   mode: file
   file: .env.production
-  required:
+  requiredKeys:
     - PLAYBOOK_API_URL
     - SESSION_SECRET
 deploy:

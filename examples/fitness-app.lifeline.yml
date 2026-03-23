@@ -11,7 +11,7 @@ healthcheckPath: /api/health
 env:
   mode: file
   file: .env.production
-  required:
+  requiredKeys:
     - DATABASE_URL
     - SESSION_SECRET
 deploy:

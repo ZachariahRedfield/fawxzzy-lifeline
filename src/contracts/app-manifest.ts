@@ -20,7 +20,7 @@ export interface AppManifest {
   env: {
     mode: EnvMode;
     file?: string;
-    required: string[];
+    requiredKeys: string[];
   };
   deploy: {
     strategy: DeployStrategy;
@@ -114,17 +114,27 @@ export function validateAppManifest(value: unknown): {
       issues.push({ path: "env.file", message: "is required when env.mode is 'file'" });
     }
 
-    if (!isStringArray(envValue.required)) {
+    const requiredKeysValue = envValue.requiredKeys ?? envValue.required;
+    const usedLegacyRequired = envValue.required !== undefined && envValue.requiredKeys === undefined;
+
+    if (!isStringArray(requiredKeysValue)) {
       issues.push({
-        path: "env.required",
+        path: "env.requiredKeys",
         message: "must be an array of non-empty strings",
       });
     } else {
       env = {
         mode: (mode as EnvMode) ?? "inline",
-        required: envValue.required,
+        requiredKeys: requiredKeysValue,
         ...(file ? { file } : {}),
       };
+    }
+
+    if (usedLegacyRequired) {
+      issues.push({
+        path: "env.required",
+        message: "has been renamed to env.requiredKeys",
+      });
     }
   }
 
@@ -154,7 +164,19 @@ export function validateAppManifest(value: unknown): {
     }
   }
 
-  if (issues.length > 0 || !name || !archetype || !repo || !branch || !installCommand || !buildCommand || !startCommand || !healthcheckPath || !env || !deploy) {
+  if (
+    issues.length > 0 ||
+    !name ||
+    !archetype ||
+    !repo ||
+    !branch ||
+    !installCommand ||
+    !buildCommand ||
+    !startCommand ||
+    !healthcheckPath ||
+    !env ||
+    !deploy
+  ) {
     return { issues };
   }
 

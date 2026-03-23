@@ -23,7 +23,7 @@ jobs:
           cache: pnpm
 
       - name: Install
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck
         run: pnpm typecheck
@@ -36,3 +36,6 @@ jobs:
 
       - name: Validate Playbook UI manifest
         run: pnpm lifeline validate examples/playbook-ui.lifeline.yml
+
+      - name: Runtime smoke verification
+        run: pnpm smoke:runtime

@@ -14,3 +14,24 @@ export class ManifestLoadError extends LifelineError {
     this.name = "ManifestLoadError";
   }
 }
+
+export class ValidationError extends LifelineError {
+  constructor(message: string) {
+    super(message, "VALIDATION_ERROR");
+    this.name = "ValidationError";
+  }
+}
+
+export class RuntimeStateError extends LifelineError {
+  constructor(message: string) {
+    super(message, "RUNTIME_STATE_ERROR");
+    this.name = "RuntimeStateError";
+  }
+}
+
+export class ProcessManagerError extends LifelineError {
+  constructor(message: string) {
+    super(message, "PROCESS_MANAGER_ERROR");
+    this.name = "ProcessManagerError";
+  }
+}
