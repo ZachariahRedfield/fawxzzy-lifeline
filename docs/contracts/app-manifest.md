@@ -87,13 +87,13 @@ Merge precedence:
 2. overridden by explicit manifest values
 
 The merge is intentionally small and predictable. Lifeline merges known manifest fields plus the nested `env` and `deploy` sections only.
-Playbook archetype exports may omit `env` defaults; env requirements can come from either Playbook defaults or explicit manifest values.
+Playbook archetype exports may omit `env` and `deploy` defaults; those requirements can come from either Playbook defaults or explicit manifest values.
 
 ## Validation vs runtime requirements
 
 - `lifeline validate <manifest>` checks raw manifest structure only.
 - `lifeline validate <manifest> --playbook-path <path>` validates the final resolved config.
-- Lifeline validates the merged result, so optional producer sections (like Playbook `env` defaults) are not required in isolation.
+- Lifeline validates the merged result, so optional producer sections (like Playbook `env` or `deploy` defaults) are not required in isolation.
 - `lifeline resolve <manifest>` prints the fully resolved config Lifeline would execute.
 
 Runtime commands are stricter and may additionally require:

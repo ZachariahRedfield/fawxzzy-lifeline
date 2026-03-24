@@ -12,15 +12,22 @@ const ACCEPTED_PLAYBOOK_EXPORT_FAMILIES = new Set([
   LEGACY_PLAYBOOK_EXPORT_FAMILY,
 ]);
 
-export type PlaybookArchetypeDefaults = Pick<
-  AppManifest,
-  | "installCommand"
-  | "buildCommand"
-  | "startCommand"
-  | "port"
-  | "healthcheckPath"
-  | "deploy"
-> & { env?: AppManifest["env"] };
+export type PlaybookArchetypeDefaults = Omit<
+  Pick<
+    AppManifest,
+    | "installCommand"
+    | "buildCommand"
+    | "startCommand"
+    | "port"
+    | "healthcheckPath"
+    | "env"
+    | "deploy"
+  >,
+  "env" | "deploy"
+> & {
+  deploy?: AppManifest["deploy"];
+  env?: AppManifest["env"];
+};
 
 export interface PlaybookExports {
   playbookPath: string;
@@ -243,9 +250,9 @@ export async function loadPlaybookArchetypeDefaults(
   }
 
   const deployValue = parsed.deploy;
-  if (!isRecord(deployValue)) {
+  if (deployValue !== undefined && !isRecord(deployValue)) {
     throw new ValidationError(
-      `Playbook archetype export ${archetypePath} is missing deploy defaults.`,
+      `Playbook export field deploy must be an object when present.`,
     );
   }
 
@@ -273,12 +280,15 @@ export async function loadPlaybookArchetypeDefaults(
     envValue === undefined
       ? undefined
       : assertStringArray("env.requiredKeys", envValue.requiredKeys ?? envValue.required);
-  const strategy = assertNonEmptyString(
-    "deploy.strategy",
-    deployValue.strategy,
-  ) as AppManifest["deploy"]["strategy"];
+  const strategy =
+    deployValue === undefined
+      ? undefined
+      : (assertNonEmptyString(
+          "deploy.strategy",
+          deployValue.strategy,
+        ) as AppManifest["deploy"]["strategy"]);
   const workingDirectory =
-    deployValue.workingDirectory === undefined
+    deployValue === undefined || deployValue.workingDirectory === undefined
       ? undefined
       : assertNonEmptyString(
           "deploy.workingDirectory",
@@ -306,9 +316,13 @@ export async function loadPlaybookArchetypeDefaults(
           },
         }
       : {}),
-    deploy: {
-      strategy,
-      ...(workingDirectory ? { workingDirectory } : {}),
-    },
+    ...(deployValue
+      ? {
+          deploy: {
+            strategy: strategy as AppManifest["deploy"]["strategy"],
+            ...(workingDirectory ? { workingDirectory } : {}),
+          },
+        }
+      : {}),
   };
 }
