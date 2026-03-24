@@ -115,11 +115,22 @@ try {
   }
 
   await withTemporaryPlaybook(
-    { schemaVersion: "1", exportFamily: "lifeline" },
+    { schemaVersion: "1", exportFamily: "lifeline-archetypes" },
     (result) => {
       if (result.code !== 0) {
         throw new Error(
           `Expected schemaVersion as numeric string to be accepted, got:\n${result.stdout}\n${result.stderr}`,
+        );
+      }
+    },
+  );
+
+  await withTemporaryPlaybook(
+    { schemaVersion: 1, exportFamily: "lifeline" },
+    (result) => {
+      if (result.code !== 0) {
+        throw new Error(
+          `Expected legacy exportFamily compatibility to be accepted, got:\n${result.stdout}\n${result.stderr}`,
         );
       }
     },
@@ -139,13 +150,16 @@ try {
     },
   );
 
-  await withTemporaryPlaybook({ exportFamily: "lifeline" }, (result) => {
-    if (result.code === 0 || !result.stderr.includes("schemaVersion")) {
-      throw new Error(
-        `Expected missing schema version to fail clearly, got:\n${result.stdout}\n${result.stderr}`,
-      );
-    }
-  });
+  await withTemporaryPlaybook(
+    { exportFamily: "lifeline-archetypes" },
+    (result) => {
+      if (result.code === 0 || !result.stderr.includes("schemaVersion")) {
+        throw new Error(
+          `Expected missing schema version to fail clearly, got:\n${result.stdout}\n${result.stderr}`,
+        );
+      }
+    },
+  );
 
   await run(["down", appName]);
 } catch (error) {

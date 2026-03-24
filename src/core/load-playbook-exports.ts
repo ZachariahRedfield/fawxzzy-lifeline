@@ -5,7 +5,12 @@ import { ManifestLoadError, ValidationError } from "./errors.js";
 import { parseSimpleYaml } from "./load-manifest.js";
 
 export const SUPPORTED_PLAYBOOK_SCHEMA_VERSION = 1;
-export const SUPPORTED_PLAYBOOK_EXPORT_FAMILY = "lifeline";
+export const CANONICAL_PLAYBOOK_EXPORT_FAMILY = "lifeline-archetypes";
+export const LEGACY_PLAYBOOK_EXPORT_FAMILY = "lifeline";
+const ACCEPTED_PLAYBOOK_EXPORT_FAMILIES = new Set([
+  CANONICAL_PLAYBOOK_EXPORT_FAMILY,
+  LEGACY_PLAYBOOK_EXPORT_FAMILY,
+]);
 
 export type PlaybookArchetypeDefaults = Pick<
   AppManifest,
@@ -61,7 +66,7 @@ function parseSchemaVersion(
   const schemaVersionRaw = parsedSchema.schemaVersion ?? parsedSchema.version;
   if (schemaVersionRaw === undefined) {
     throw new ValidationError(
-      `Playbook schema version file is invalid: ${schemaVersionPath}. Expected {"schemaVersion": <number|string>, "exportFamily": "lifeline"} (or legacy {"version": <number>}).`,
+      `Playbook schema version file is invalid: ${schemaVersionPath}. Expected {"schemaVersion": <number|string>, "exportFamily": "lifeline-archetypes"} (or compatibility value "lifeline", or legacy {"version": <number>}).`,
     );
   }
 
@@ -89,7 +94,7 @@ function parseExportFamily(
 ): string {
   const exportFamilyRaw = parsedSchema.exportFamily;
   if (exportFamilyRaw === undefined) {
-    return SUPPORTED_PLAYBOOK_EXPORT_FAMILY;
+    return CANONICAL_PLAYBOOK_EXPORT_FAMILY;
   }
 
   if (
@@ -101,13 +106,13 @@ function parseExportFamily(
     );
   }
 
-  if (exportFamilyRaw !== SUPPORTED_PLAYBOOK_EXPORT_FAMILY) {
+  if (!ACCEPTED_PLAYBOOK_EXPORT_FAMILIES.has(exportFamilyRaw)) {
     throw new ValidationError(
-      `Unsupported Playbook export family ${exportFamilyRaw} at ${schemaVersionPath}. Expected ${SUPPORTED_PLAYBOOK_EXPORT_FAMILY}.`,
+      `Unsupported Playbook export family ${exportFamilyRaw} at ${schemaVersionPath}. Expected one of: ${CANONICAL_PLAYBOOK_EXPORT_FAMILY}, ${LEGACY_PLAYBOOK_EXPORT_FAMILY}.`,
     );
   }
 
-  return exportFamilyRaw;
+  return CANONICAL_PLAYBOOK_EXPORT_FAMILY;
 }
 
 async function readYamlFile(filePath: string): Promise<unknown> {

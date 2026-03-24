@@ -76,10 +76,10 @@ Path precedence:
 
 Playbook export metadata contract:
 
-- preferred/current: `{ "schemaVersion": <number|string>, "exportFamily": "lifeline" }`
+- preferred/current: `{ "schemaVersion": <number|string>, "exportFamily": "lifeline-archetypes" }`
 - legacy compatibility: `{ "version": <number> }`
 - when both are present, `schemaVersion` is used
-- when `exportFamily` is present, it must be `lifeline`
+- when `exportFamily` is present, Lifeline accepts `lifeline-archetypes` (canonical) and `lifeline` (legacy compatibility), then normalizes to `lifeline-archetypes` internally
 
 Merge precedence:
 
