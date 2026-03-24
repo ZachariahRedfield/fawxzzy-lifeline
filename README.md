@@ -63,13 +63,13 @@ If a Playbook path is supplied but invalid, Lifeline fails clearly before runtim
 
 Lifeline reads `<playbook-path>/exports/lifeline/schema-version.json` and accepts:
 
-- current contract: `{ "schemaVersion": <number|string>, "exportFamily": "lifeline" }`
+- canonical/current contract: `{ "schemaVersion": <number|string>, "exportFamily": "lifeline-archetypes" }`
 - legacy compatibility: `{ "version": <number> }`
 
 Behavior is explicit:
 
 - `schemaVersion` takes precedence over `version` when both are present
-- `exportFamily` must be `lifeline` when present
+- `exportFamily` accepts `lifeline-archetypes` (canonical) and `lifeline` (legacy compatibility), and Lifeline normalizes internally to `lifeline-archetypes`
 - missing schema version fields fail clearly
 - unsupported schema versions fail clearly
 

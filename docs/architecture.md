@@ -23,7 +23,7 @@ The current export loader reads:
 - `archetypes/next-web.yml`
 - `archetypes/node-web.yml`
 
-`schema-version.json` accepts the checked-in Playbook shape `{ "schemaVersion": <number|string>, "exportFamily": "lifeline" }` and keeps legacy compatibility for `{ "version": <number> }`. Lifeline normalizes either input at the boundary before continuing resolution.
+`schema-version.json` accepts the checked-in Playbook shape `{ "schemaVersion": <number|string>, "exportFamily": "lifeline-archetypes" }` and keeps legacy compatibility for `exportFamily: "lifeline"` and for `{ "version": <number> }`. Lifeline normalizes accepted export-family values at the boundary to `lifeline-archetypes` before continuing resolution.
 
 Failure handling is intentionally explicit:
 
