@@ -3,6 +3,3 @@ buildCommand: node -e "console.log('build ok')"
 startCommand: node server.js
 port: 4310
 healthcheckPath: /healthz
-deploy:
-  strategy: rebuild
-  workingDirectory: .

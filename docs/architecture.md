@@ -57,7 +57,7 @@ The runtime layer is still intentionally small:
 - `resolve-config` merges optional Playbook defaults with explicit manifest values
 - merge precedence is fixed: Playbook defaults first, manifest values second
 - only known top-level fields plus `env` and `deploy` are merged
-- Playbook archetype exports may omit `env` defaults; manifest `env` values are then used directly
+- Playbook archetype exports may omit `env` and `deploy` defaults; manifest values are then used directly for those sections
 - validation targets the final resolved config, not optional producer sections in isolation
 - `deploy.workingDirectory` identifies the local app checkout to operate on
 - env-file parsing is in-repo and minimal (`KEY=VALUE`, comments, blank lines)

@@ -94,6 +94,11 @@ try {
       `Expected manifest env requirements to remain in resolved output when archetype omits env defaults, got:\n${resolveOutput.stdout}\n${resolveOutput.stderr}`,
     );
   }
+  if (!resolveOutput.stdout.includes('"workingDirectory": "."')) {
+    throw new Error(
+      `Expected manifest deploy workingDirectory to remain in resolved output when archetype omits deploy defaults, got:\n${resolveOutput.stdout}\n${resolveOutput.stderr}`,
+    );
+  }
 
   await run(["validate", manifestPath, "--playbook-path", fixturePlaybookPath]);
   await run(["up", manifestPath, "--playbook-path", fixturePlaybookPath]);

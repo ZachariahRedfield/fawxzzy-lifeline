@@ -82,7 +82,7 @@ Resolution is intentionally small and explicit:
 3. explicit manifest values always win
 
 Lifeline only merges known top-level manifest fields plus the nested `env` and `deploy` sections. It does not perform arbitrary deep-merge magic.
-Playbook archetype exports may omit `env` defaults; in that case, env requirements must come from explicit manifest values.
+Playbook archetype exports may omit `env` and `deploy` defaults; in that case, those requirements must come from explicit manifest values.
 
 ## Validation and resolution behavior
 
