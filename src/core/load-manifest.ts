@@ -25,6 +25,10 @@ function stripComment(line: string): string {
 }
 
 function parseScalar(value: string): unknown {
+  if (value === "[]") {
+    return [];
+  }
+
   if (/^-?\d+$/.test(value)) {
     return Number(value);
   }

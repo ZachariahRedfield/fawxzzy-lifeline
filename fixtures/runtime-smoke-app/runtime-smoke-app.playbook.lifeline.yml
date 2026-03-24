@@ -6,9 +6,6 @@ port: 4310
 env:
   mode: file
   file: .env.runtime
-  requiredKeys:
-    - PORT
-    - SMOKE_TOKEN
 deploy:
   strategy: rebuild
   workingDirectory: .

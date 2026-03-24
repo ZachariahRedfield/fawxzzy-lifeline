@@ -105,7 +105,8 @@ Playbook archetype exports are sparse optional default bundles. They may omit an
 - resolves `deploy.workingDirectory` relative to the manifest file
 - loads `env.file` if present
 - overlays `process.env` on top of env-file values
-- validates `env.requiredKeys`
+- normalizes missing `env.requiredKeys` to `[]`
+- validates provided `env.requiredKeys` entries
 - runs `installCommand`
 - runs `buildCommand`
 - starts `startCommand` as a background process

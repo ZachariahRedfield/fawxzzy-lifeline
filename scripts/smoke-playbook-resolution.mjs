@@ -116,9 +116,9 @@ try {
       `Expected resolved defaults in output, got:\n${resolveOutput.stdout}\n${resolveOutput.stderr}`,
     );
   }
-  if (!resolveOutput.stdout.includes('"requiredKeys": [\n      "PORT",\n      "SMOKE_TOKEN"\n    ]')) {
+  if (!resolveOutput.stdout.includes('"requiredKeys": []')) {
     throw new Error(
-      `Expected manifest env requirements to remain in resolved output when archetype omits env defaults, got:\n${resolveOutput.stdout}\n${resolveOutput.stderr}`,
+      `Expected missing manifest env requirements to normalize to an empty list in resolved output, got:\n${resolveOutput.stdout}\n${resolveOutput.stderr}`,
     );
   }
   if (!resolveOutput.stdout.includes('"workingDirectory": "."')) {

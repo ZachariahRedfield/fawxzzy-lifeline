@@ -161,14 +161,15 @@ function validateManifestLike(
       });
     }
 
-    const requiredKeysValue = envValue.requiredKeys ?? envValue.required;
+    const requiredKeysValue = envValue.requiredKeys ?? envValue.required ?? [];
     const usedLegacyRequired =
       envValue.required !== undefined && envValue.requiredKeys === undefined;
 
     if (!isStringArray(requiredKeysValue)) {
       issues.push({
         path: "env.requiredKeys",
-        message: "must be an array of non-empty strings",
+        message:
+          "must be an array when provided, and each key must be a non-empty string",
       });
     } else {
       env = {

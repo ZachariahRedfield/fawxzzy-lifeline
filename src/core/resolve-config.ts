@@ -41,14 +41,16 @@ function mergeManifestWithDefaults(
       ? manifest.env.requiredKeys
       : Array.isArray(manifest.env?.required)
         ? manifest.env.required
-        : defaults?.env?.requiredKeys;
+        : Array.isArray(defaults?.env?.requiredKeys)
+          ? defaults.env.requiredKeys
+          : [];
 
-    merged.env = {
-      ...(defaults?.env ?? {}),
-      ...(isRecord(manifest.env) ? manifest.env : {}),
-      ...(requiredKeys ? { requiredKeys } : {}),
-    };
-  }
+      merged.env = {
+        ...(defaults?.env ?? {}),
+        ...(isRecord(manifest.env) ? manifest.env : {}),
+        requiredKeys,
+      };
+    }
 
   if (defaults?.deploy || isRecord(manifest.deploy)) {
     merged.deploy = {

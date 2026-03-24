@@ -60,7 +60,7 @@ This manifest is not valid on its own for manifest-only runtime execution. It be
 - `healthcheckPath`: HTTP path used for runtime health checks.
 - `env.mode`: how environment variables are supplied. v1 supports `inline` and `file`.
 - `env.file`: optional env file path when `mode` is `file`.
-- `env.requiredKeys`: list of required environment variable keys after env-file values and shell env are merged.
+- `env.requiredKeys`: optional list of required environment variable keys after env-file values and shell env are merged. If omitted, Lifeline normalizes it to `[]`.
 - `deploy.strategy`: deployment strategy label. v1 supports `rebuild` and `restart`.
 - `deploy.workingDirectory`: machine-local directory used by runtime flows. Relative paths resolve from the manifest file location.
 
@@ -100,8 +100,10 @@ Runtime commands are stricter and may additionally require:
 
 - `deploy.workingDirectory` to exist on the current machine after resolution
 - `env.file` to exist if declared after resolution
-- every `env.requiredKeys` entry to be present after env merging
+- every provided `env.requiredKeys` entry to be present after env merging
 - runtime commands to succeed from the resolved working directory
+
+Apps with no required environment variables may omit `env.requiredKeys` entirely or set `requiredKeys: []`.
 
 This split keeps the shared contract stable while still allowing local execution to fail early and clearly when machine-local prerequisites are missing.
 
