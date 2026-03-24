@@ -4,7 +4,10 @@ export interface HealthcheckResult {
   error?: string;
 }
 
-export async function checkHealth(port: number, healthcheckPath: string): Promise<HealthcheckResult> {
+export async function checkHealth(
+  port: number,
+  healthcheckPath: string,
+): Promise<HealthcheckResult> {
   const url = `http://127.0.0.1:${port}${healthcheckPath}`;
 
   try {
@@ -22,9 +25,16 @@ export async function checkHealth(port: number, healthcheckPath: string): Promis
   }
 }
 
-export async function waitForHealth(port: number, healthcheckPath: string, timeoutMs = 30_000): Promise<HealthcheckResult> {
+export async function waitForHealth(
+  port: number,
+  healthcheckPath: string,
+  timeoutMs = 30_000,
+): Promise<HealthcheckResult> {
   const deadline = Date.now() + timeoutMs;
-  let lastResult: HealthcheckResult = { ok: false, error: "healthcheck not attempted" };
+  let lastResult: HealthcheckResult = {
+    ok: false,
+    error: "healthcheck not attempted",
+  };
 
   while (Date.now() < deadline) {
     lastResult = await checkHealth(port, healthcheckPath);

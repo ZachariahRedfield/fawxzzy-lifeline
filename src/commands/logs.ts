@@ -1,7 +1,10 @@
 import { tailLogFile } from "../core/log-store.js";
 import { getAppState } from "../core/state-store.js";
 
-export async function runLogsCommand(appName: string, lineCount = 100): Promise<number> {
+export async function runLogsCommand(
+  appName: string,
+  lineCount = 100,
+): Promise<number> {
   const state = await getAppState(appName);
   if (!state) {
     console.error(`No runtime state found for app ${appName}.`);

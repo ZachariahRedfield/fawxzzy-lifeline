@@ -1,6 +1,6 @@
 import { checkHealth } from "../core/healthcheck.js";
-import { getAppState, upsertAppState } from "../core/state-store.js";
 import { isProcessAlive } from "../core/process-manager.js";
+import { getAppState, upsertAppState } from "../core/state-store.js";
 
 export async function runStatusCommand(appName: string): Promise<number> {
   const state = await getAppState(appName);
@@ -31,7 +31,11 @@ export async function runStatusCommand(appName: string): Promise<number> {
   console.log(`- port: ${state.port}`);
   console.log(`- log: ${state.logPath}`);
   console.log(`- manifest: ${state.manifestPath}`);
-  console.log(`- healthcheck: http://127.0.0.1:${state.port}${state.healthcheckPath}`);
-  console.log(`- health: ${health.ok ? `ok (${health.status ?? 200})` : health.error ?? "failed"}`);
+  console.log(
+    `- healthcheck: http://127.0.0.1:${state.port}${state.healthcheckPath}`,
+  );
+  console.log(
+    `- health: ${health.ok ? `ok (${health.status ?? 200})` : (health.error ?? "failed")}`,
+  );
   return health.ok ? 0 : 1;
 }

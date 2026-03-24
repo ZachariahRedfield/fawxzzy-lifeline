@@ -1,6 +1,6 @@
 # Lifeline
 
-Lifeline is the opinionated, self-hosted local operator for manifest-defined apps. This repository is intentionally narrow: Lifeline v1 now validates manifests and runs one stable local or staging-style instance on one machine.
+Lifeline is the opinionated, self-hosted local operator for manifest-defined apps. This repository is intentionally narrow: Lifeline v1 validates manifests, resolves optional Playbook defaults from disk, and runs one stable local or staging-style instance on one machine.
 
 ## Why Lifeline exists
 
@@ -10,8 +10,9 @@ Lifeline provides a boring, low-maintenance way to describe how an app should be
 
 - A single-package TypeScript CLI for a manifest-defined local operator.
 - A home for a small, explicit app manifest contract.
-- A runtime slice that can `up`, `down`, `status`, `logs`, `restart`, and `validate` one app on one machine.
-- A fixture-based smoke path that verifies the runtime behavior end to end without depending on external apps.
+- A file-based config resolver that can optionally read Playbook archetype exports from a local checkout.
+- A runtime slice that can `resolve`, `up`, `down`, `status`, `logs`, `restart`, and `validate` one app on one machine.
+- Fixture-based smoke paths that verify manifest-only runtime behavior and Playbook-backed resolution without depending on an external Playbook repo.
 
 ## What Lifeline is not
 
@@ -22,6 +23,7 @@ Lifeline provides a boring, low-maintenance way to describe how an app should be
 - Not a multi-node orchestrator.
 - Not a hot reload replacement.
 - Not repo clone/pull, webhook, proxy, or domain automation.
+- Not coupled to a running Playbook process, service, or UI.
 
 ## Current v1 commands
 
@@ -29,19 +31,59 @@ Lifeline provides a boring, low-maintenance way to describe how an app should be
 pnpm install
 pnpm build
 pnpm lifeline validate examples/fitness-app.lifeline.yml
-pnpm lifeline validate examples/playbook-ui.lifeline.yml
+pnpm lifeline resolve fixtures/runtime-smoke-app/runtime-smoke-app.lifeline.yml
+pnpm lifeline resolve fixtures/runtime-smoke-app/runtime-smoke-app.playbook.lifeline.yml --playbook-path fixtures/playbook-export
+pnpm lifeline validate fixtures/runtime-smoke-app/runtime-smoke-app.playbook.lifeline.yml --playbook-path fixtures/playbook-export
 pnpm lifeline up fixtures/runtime-smoke-app/runtime-smoke-app.lifeline.yml
+pnpm lifeline up fixtures/runtime-smoke-app/runtime-smoke-app.playbook.lifeline.yml --playbook-path fixtures/playbook-export
 pnpm lifeline status runtime-smoke-app
 pnpm lifeline logs runtime-smoke-app
 pnpm lifeline restart runtime-smoke-app
 pnpm lifeline down runtime-smoke-app
 ```
 
+## Optional Playbook integration
+
+Playbook is treated as one repo with two separate roles:
+
+- a human-facing local UI/workflow for operators
+- a machine-readable export surface for Lifeline at `<playbook-path>/exports/lifeline/`
+
+Lifeline only consumes the checked-in export files from disk. It does not call a Playbook HTTP API, does not require Playbook to be running, and still works fully in manifest-only mode.
+
+### Playbook path precedence
+
+1. `--playbook-path <path>`
+2. `LIFELINE_PLAYBOOK_PATH`
+3. no Playbook path, which means manifest-only mode
+
+If a Playbook path is supplied but invalid, Lifeline fails clearly before runtime execution.
+
+### Merge precedence
+
+Resolution is intentionally small and explicit:
+
+1. start from Playbook archetype defaults when a Playbook path is available
+2. apply manifest values on top
+3. explicit manifest values always win
+
+Lifeline only merges known top-level manifest fields plus the nested `env` and `deploy` sections. It does not perform arbitrary deep-merge magic.
+
+## Validation and resolution behavior
+
+- `lifeline validate <manifest>` validates the raw manifest structure only.
+- `lifeline validate <manifest> --playbook-path <path>` validates the resolved config, so required runtime fields may come from Playbook defaults.
+- `lifeline resolve <manifest>` prints the fully resolved config that Lifeline would execute.
+- `lifeline up` and `lifeline restart` use the same resolution path as `resolve`.
+- If an app was started with Playbook defaults, Lifeline stores the resolved Playbook path in `.lifeline/state.json` so `restart` remains deterministic without retyping flags.
+
 ## Runtime behavior
 
-`lifeline up <manifest-path>` now performs the local runtime lifecycle:
+`lifeline up <manifest-path>` performs the local runtime lifecycle:
 
 - loads the manifest
+- optionally loads Playbook archetype defaults from disk
+- resolves config before validation and execution
 - resolves `deploy.workingDirectory` relative to the manifest file
 - loads `env.file` if present
 - overlays `process.env` on top of env-file values
@@ -53,27 +95,42 @@ pnpm lifeline down runtime-smoke-app
 - stores runtime state in `.lifeline/state.json`
 - polls `http://127.0.0.1:<port><healthcheckPath>` for a simple health check
 
-## Why `workingDirectory` is required for runtime commands
+## Slim manifest example with Playbook defaults
 
-Manifest validation stays structural. Runtime commands are stricter because they must operate against a real local checkout. That means `deploy.workingDirectory` must resolve on the current machine, and relative paths resolve from the manifest file location rather than from the shell's current working directory.
+This manifest is intentionally incomplete on its own, but becomes runnable when paired with a Playbook export for the `node-web` archetype:
+
+```yaml
+name: runtime-smoke-app
+archetype: node-web
+repo: local-fixture
+branch: main
+```
+
+Run it with:
+
+```bash
+pnpm lifeline resolve fixtures/runtime-smoke-app/runtime-smoke-app.playbook.lifeline.yml \
+  --playbook-path fixtures/playbook-export
+```
 
 ## Runtime state and logs
 
 Lifeline stores its local operator artifacts under `.lifeline/`:
 
-- `.lifeline/state.json`: explicit runtime state keyed by app name
+- `.lifeline/state.json`: explicit runtime state keyed by app name, including the stored `playbookPath` when one was used
 - `.lifeline/logs/<app-name>.log`: appended stdout/stderr logs for the managed process
 
 The directory is gitignored because it is machine-local runtime state, not source-controlled config.
 
-## Fixture app and smoke verification
+## Fixture apps and smoke verification
 
-The `fixtures/runtime-smoke-app/` app exists only to verify Lifeline's runtime slice end to end. It is a tiny Node HTTP server with a `/healthz` endpoint and a matching manifest. This keeps CI deterministic and prevents runtime verification from depending on real external apps.
+The `fixtures/runtime-smoke-app/` app exists only to verify Lifeline's runtime slice end to end. The `fixtures/playbook-export/` tree mirrors the expected Playbook export layout so CI can verify Playbook-backed resolution without depending on the real external Playbook repo.
 
-Run the smoke path with:
+Run the smoke paths with:
 
 ```bash
 pnpm smoke:runtime
+pnpm smoke:playbook
 ```
 
 ## Early target manifests

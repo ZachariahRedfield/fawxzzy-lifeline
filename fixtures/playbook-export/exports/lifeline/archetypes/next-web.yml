@@ -1,0 +1,14 @@
+installCommand: pnpm install --frozen-lockfile
+buildCommand: pnpm build
+startCommand: pnpm start
+port: 3000
+healthcheckPath: /api/health
+env:
+  mode: file
+  file: .env.production
+  requiredKeys:
+    - DATABASE_URL
+    - SESSION_SECRET
+deploy:
+  strategy: rebuild
+  workingDirectory: .

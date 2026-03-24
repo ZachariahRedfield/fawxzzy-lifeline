@@ -1,0 +1,4 @@
+name: runtime-smoke-app
+archetype: node-web
+repo: local-fixture
+branch: main

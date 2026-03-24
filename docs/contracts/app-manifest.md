@@ -7,7 +7,7 @@ Lifeline manifests are YAML files that describe a deployable application using o
 - `next-web`
 - `node-web`
 
-## YAML shape
+## Full YAML shape
 
 ```yaml
 name: fitness-app
@@ -31,6 +31,21 @@ deploy:
   workingDirectory: /srv/fitness-app
 ```
 
+## Slimmer manifest shape with Playbook defaults
+
+When `--playbook-path` or `LIFELINE_PLAYBOOK_PATH` is supplied, Lifeline may source runtime defaults for the manifest archetype from `<playbook-path>/exports/lifeline/` and then apply explicit manifest values on top.
+
+That allows a smaller manifest such as:
+
+```yaml
+name: runtime-smoke-app
+archetype: node-web
+repo: local-fixture
+branch: main
+```
+
+This manifest is not valid on its own for manifest-only runtime execution. It becomes valid only after Playbook defaults are applied.
+
 ## Field intent
 
 - `name`: stable app identifier used by operators.
@@ -49,14 +64,33 @@ deploy:
 - `deploy.strategy`: deployment strategy label. v1 supports `rebuild` and `restart`.
 - `deploy.workingDirectory`: machine-local directory used by runtime flows. Relative paths resolve from the manifest file location.
 
+## Resolution behavior
+
+Playbook integration is optional and explicit.
+
+Path precedence:
+
+1. `--playbook-path <path>`
+2. `LIFELINE_PLAYBOOK_PATH`
+3. no Playbook path, which means manifest-only mode
+
+Merge precedence:
+
+1. Playbook archetype defaults
+2. overridden by explicit manifest values
+
+The merge is intentionally small and predictable. Lifeline merges known manifest fields plus the nested `env` and `deploy` sections only.
+
 ## Validation vs runtime requirements
 
-`lifeline validate` checks manifest structure only.
+- `lifeline validate <manifest>` checks raw manifest structure only.
+- `lifeline validate <manifest> --playbook-path <path>` validates the final resolved config.
+- `lifeline resolve <manifest>` prints the fully resolved config Lifeline would execute.
 
 Runtime commands are stricter and may additionally require:
 
-- `deploy.workingDirectory` to exist on the current machine
-- `env.file` to exist if declared
+- `deploy.workingDirectory` to exist on the current machine after resolution
+- `env.file` to exist if declared after resolution
 - every `env.requiredKeys` entry to be present after env merging
 - runtime commands to succeed from the resolved working directory
 
@@ -77,8 +111,10 @@ The fitness app and Playbook UI fit the same contract because Lifeline models op
 
 Their manifests are examples and early targets. Their code is not embedded in this repository.
 
-## Example manifests
+## Example manifests and fixtures
 
 - [`examples/fitness-app.lifeline.yml`](../../examples/fitness-app.lifeline.yml)
 - [`examples/playbook-ui.lifeline.yml`](../../examples/playbook-ui.lifeline.yml)
 - [`fixtures/runtime-smoke-app/runtime-smoke-app.lifeline.yml`](../../fixtures/runtime-smoke-app/runtime-smoke-app.lifeline.yml)
+- [`fixtures/runtime-smoke-app/runtime-smoke-app.playbook.lifeline.yml`](../../fixtures/runtime-smoke-app/runtime-smoke-app.playbook.lifeline.yml)
+- [`fixtures/playbook-export/exports/lifeline/archetypes/node-web.yml`](../../fixtures/playbook-export/exports/lifeline/archetypes/node-web.yml)

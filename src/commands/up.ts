@@ -1,71 +1,94 @@
 import path from "node:path";
 
 import type { AppManifest } from "../contracts/app-manifest.js";
-import { validateAppManifest } from "../contracts/app-manifest.js";
+import { ManifestLoadError, ValidationError } from "../core/errors.js";
 import { checkHealth, waitForHealth } from "../core/healthcheck.js";
 import { loadEnvFile } from "../core/load-env-file.js";
-import { loadManifestFile } from "../core/load-manifest.js";
 import { appendLogHeader, getLogPath } from "../core/log-store.js";
-import { isProcessAlive, runForegroundCommand, startBackgroundProcess } from "../core/process-manager.js";
+import {
+  isProcessAlive,
+  runForegroundCommand,
+  startBackgroundProcess,
+} from "../core/process-manager.js";
+import { resolveManifestConfig } from "../core/resolve-config.js";
 import { resolveWorkingDirectory } from "../core/resolve-working-directory.js";
 import { getAppState, upsertAppState } from "../core/state-store.js";
-import { ManifestLoadError, ValidationError } from "../core/errors.js";
 
 export interface PreparedRuntimeApp {
   manifest: AppManifest;
   manifestPath: string;
   workingDirectory: string;
   env: NodeJS.ProcessEnv;
+  playbookPath?: string | undefined;
 }
 
-export async function prepareRuntimeApp(manifestPathInput: string): Promise<PreparedRuntimeApp> {
+export async function prepareRuntimeApp(
+  manifestPathInput: string,
+  playbookPath?: string,
+): Promise<PreparedRuntimeApp> {
   const manifestPath = path.resolve(manifestPathInput);
-  const rawManifest = await loadManifestFile(manifestPath);
-  const result = validateAppManifest(rawManifest);
+  const resolved = await resolveManifestConfig(
+    playbookPath ? { manifestPath, playbookPath } : { manifestPath },
+  );
 
-  if (result.issues.length > 0 || !result.manifest) {
-    throw new ValidationError(
-      `Manifest is invalid: ${manifestPath}\n${result.issues.map((issue) => `- ${issue.path}: ${issue.message}`).join("\n")}`,
-    );
-  }
-
-  const workingDirectory = await resolveWorkingDirectory(manifestPath, result.manifest);
-  const fileEnv = result.manifest.env.file
-    ? await loadEnvFile(path.resolve(path.dirname(manifestPath), result.manifest.env.file))
+  const workingDirectory = await resolveWorkingDirectory(
+    manifestPath,
+    resolved.resolvedManifest,
+  );
+  const fileEnv = resolved.resolvedManifest.env.file
+    ? await loadEnvFile(
+        path.resolve(
+          path.dirname(manifestPath),
+          resolved.resolvedManifest.env.file,
+        ),
+      )
     : {};
   const env: NodeJS.ProcessEnv = {
     ...fileEnv,
     ...process.env,
   };
 
-  const missingKeys = result.manifest.env.requiredKeys.filter((key) => !env[key]);
+  const missingKeys = resolved.resolvedManifest.env.requiredKeys.filter(
+    (key) => !env[key],
+  );
   if (missingKeys.length > 0) {
     throw new ValidationError(
-      `App ${result.manifest.name} is missing required environment keys: ${missingKeys.join(", ")}.`,
+      `App ${resolved.resolvedManifest.name} is missing required environment keys: ${missingKeys.join(", ")}.`,
     );
   }
 
   return {
-    manifest: result.manifest,
+    manifest: resolved.resolvedManifest,
     manifestPath,
     workingDirectory,
     env,
+    ...(resolved.playbookPath ? { playbookPath: resolved.playbookPath } : {}),
   };
 }
 
-export async function runUpCommand(manifestPathInput: string): Promise<number> {
+export async function runUpCommand(
+  manifestPathInput: string,
+  playbookPath?: string,
+): Promise<number> {
   try {
-    const prepared = await prepareRuntimeApp(manifestPathInput);
+    const prepared = await prepareRuntimeApp(manifestPathInput, playbookPath);
     const existing = await getAppState(prepared.manifest.name);
     if (existing && (await isProcessAlive(existing.pid))) {
-      console.error(`App ${prepared.manifest.name} is already running with pid ${existing.pid}.`);
+      console.error(
+        `App ${prepared.manifest.name} is already running with pid ${existing.pid}.`,
+      );
       return 1;
     }
 
     const logPath = await getLogPath(prepared.manifest.name);
-    await appendLogHeader(logPath, `=== lifeline up ${new Date().toISOString()} ===`);
+    await appendLogHeader(
+      logPath,
+      `=== lifeline up ${new Date().toISOString()} ===`,
+    );
 
-    console.log(`Installing ${prepared.manifest.name} in ${prepared.workingDirectory}...`);
+    console.log(
+      `Installing ${prepared.manifest.name} in ${prepared.workingDirectory}...`,
+    );
     await runForegroundCommand({
       command: prepared.manifest.installCommand,
       cwd: prepared.workingDirectory,
@@ -73,7 +96,9 @@ export async function runUpCommand(manifestPathInput: string): Promise<number> {
       label: `${prepared.manifest.name} installCommand`,
     });
 
-    console.log(`Building ${prepared.manifest.name} in ${prepared.workingDirectory}...`);
+    console.log(
+      `Building ${prepared.manifest.name} in ${prepared.workingDirectory}...`,
+    );
     await runForegroundCommand({
       command: prepared.manifest.buildCommand,
       cwd: prepared.workingDirectory,
@@ -94,6 +119,7 @@ export async function runUpCommand(manifestPathInput: string): Promise<number> {
     await upsertAppState({
       name: prepared.manifest.name,
       manifestPath: prepared.manifestPath,
+      ...(prepared.playbookPath ? { playbookPath: prepared.playbookPath } : {}),
       workingDirectory: prepared.workingDirectory,
       pid,
       port: prepared.manifest.port,
@@ -103,11 +129,15 @@ export async function runUpCommand(manifestPathInput: string): Promise<number> {
       lastKnownStatus: "running",
     });
 
-    const health = await waitForHealth(prepared.manifest.port, prepared.manifest.healthcheckPath);
+    const health = await waitForHealth(
+      prepared.manifest.port,
+      prepared.manifest.healthcheckPath,
+    );
     const lastKnownStatus = health.ok ? "running" : "unhealthy";
     await upsertAppState({
       name: prepared.manifest.name,
       manifestPath: prepared.manifestPath,
+      ...(prepared.playbookPath ? { playbookPath: prepared.playbookPath } : {}),
       workingDirectory: prepared.workingDirectory,
       pid,
       port: prepared.manifest.port,
@@ -124,15 +154,24 @@ export async function runUpCommand(manifestPathInput: string): Promise<number> {
       return 1;
     }
 
-    const confirmed = await checkHealth(prepared.manifest.port, prepared.manifest.healthcheckPath);
+    const confirmed = await checkHealth(
+      prepared.manifest.port,
+      prepared.manifest.healthcheckPath,
+    );
     console.log(`App ${prepared.manifest.name} is running.`);
     console.log(`- pid: ${pid}`);
     console.log(`- port: ${prepared.manifest.port}`);
     console.log(`- log: ${logPath}`);
+    if (prepared.playbookPath) {
+      console.log(`- playbook: ${prepared.playbookPath}`);
+    }
     console.log(`- health: ${confirmed.status ?? "ok"}`);
     return 0;
   } catch (error) {
-    if (error instanceof ManifestLoadError || error instanceof ValidationError) {
+    if (
+      error instanceof ManifestLoadError ||
+      error instanceof ValidationError
+    ) {
       console.error(error.message);
       return 1;
     }

@@ -4,6 +4,7 @@ import path from "node:path";
 export interface RuntimeAppState {
   name: string;
   manifestPath: string;
+  playbookPath?: string | undefined;
   workingDirectory: string;
   pid: number;
   port: number;
@@ -43,10 +44,12 @@ export async function readState(): Promise<RuntimeStateFile> {
 
 export async function writeState(state: RuntimeStateFile): Promise<void> {
   await ensureStateDirectory();
-  await writeFile(STATE_PATH, JSON.stringify(state, null, 2) + "\n", "utf8");
+  await writeFile(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 }
 
-export async function getAppState(appName: string): Promise<RuntimeAppState | undefined> {
+export async function getAppState(
+  appName: string,
+): Promise<RuntimeAppState | undefined> {
   const state = await readState();
   return state.apps[appName];
 }

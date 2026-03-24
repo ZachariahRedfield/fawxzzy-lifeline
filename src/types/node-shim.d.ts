@@ -6,10 +6,20 @@ declare namespace NodeJS {
 
 declare module "node:fs/promises" {
   export function readFile(path: string, encoding: string): Promise<string>;
-  export function writeFile(path: string, data: string, encoding: string): Promise<void>;
-  export function mkdir(path: string, options?: { recursive?: boolean }): Promise<void>;
+  export function writeFile(
+    path: string,
+    data: string,
+    encoding: string,
+  ): Promise<void>;
+  export function mkdir(
+    path: string,
+    options?: { recursive?: boolean },
+  ): Promise<void>;
   export function access(path: string): Promise<void>;
-  export function open(path: string, flags: string): Promise<{
+  export function open(
+    path: string,
+    flags: string,
+  ): Promise<{
     fd: number;
     appendFile(data: string): Promise<void>;
     close(): Promise<void>;
@@ -30,7 +40,11 @@ declare module "node:child_process" {
     cwd?: string;
     env?: NodeJS.ProcessEnv;
     shell?: boolean;
-    stdio?: "inherit" | "ignore" | ["ignore", number, number] | ["ignore", "pipe", "pipe"];
+    stdio?:
+      | "inherit"
+      | "ignore"
+      | ["ignore", number, number]
+      | ["ignore", "pipe", "pipe"];
     detached?: boolean;
   }
 
@@ -39,13 +53,20 @@ declare module "node:child_process" {
     stdout: { on(event: "data", listener: (chunk: unknown) => void): void };
     stderr: { on(event: "data", listener: (chunk: unknown) => void): void };
     on(event: "error", listener: (error: Error) => void): void;
-    on(event: "exit", listener: (code: number | null, signal?: string | null) => void): void;
+    on(
+      event: "exit",
+      listener: (code: number | null, signal?: string | null) => void,
+    ): void;
     on(event: "spawn", listener: () => void): void;
     unref(): void;
   }
 
   export function spawn(command: string, options?: SpawnOptions): ChildProcess;
-  export function spawn(command: string, args: string[], options?: SpawnOptions): ChildProcess;
+  export function spawn(
+    command: string,
+    args: string[],
+    options?: SpawnOptions,
+  ): ChildProcess;
 }
 
 declare const console: {
@@ -62,4 +83,7 @@ declare const process: {
   kill(pid: number, signal?: number | string): void;
 };
 
-declare function setTimeout(callback: (...args: unknown[]) => void, delay?: number): unknown;
+declare function setTimeout(
+  callback: (...args: unknown[]) => void,
+  delay?: number,
+): unknown;

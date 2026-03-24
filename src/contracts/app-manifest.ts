@@ -28,6 +28,13 @@ export interface AppManifest {
   };
 }
 
+export type AppManifestInput = Partial<Omit<AppManifest, "env" | "deploy">> & {
+  env?: Partial<AppManifest["env"]> & {
+    required?: string[];
+  };
+  deploy?: Partial<AppManifest["deploy"]>;
+};
+
 export interface ValidationIssue {
   path: string;
   message: string;
@@ -84,8 +91,16 @@ export function validateAppManifest(value: unknown): {
     projectPath = checkString("projectPath", value.projectPath);
   }
 
-  if (typeof value.port !== "number" || !Number.isInteger(value.port) || value.port < 1 || value.port > 65535) {
-    issues.push({ path: "port", message: "must be an integer between 1 and 65535" });
+  if (
+    typeof value.port !== "number" ||
+    !Number.isInteger(value.port) ||
+    value.port < 1 ||
+    value.port > 65535
+  ) {
+    issues.push({
+      path: "port",
+      message: "must be an integer between 1 and 65535",
+    });
   }
 
   if (healthcheckPath && !healthcheckPath.startsWith("/")) {
@@ -111,11 +126,15 @@ export function validateAppManifest(value: unknown): {
     }
 
     if (mode === "file" && !file) {
-      issues.push({ path: "env.file", message: "is required when env.mode is 'file'" });
+      issues.push({
+        path: "env.file",
+        message: "is required when env.mode is 'file'",
+      });
     }
 
     const requiredKeysValue = envValue.requiredKeys ?? envValue.required;
-    const usedLegacyRequired = envValue.required !== undefined && envValue.requiredKeys === undefined;
+    const usedLegacyRequired =
+      envValue.required !== undefined && envValue.requiredKeys === undefined;
 
     if (!isStringArray(requiredKeysValue)) {
       issues.push({
@@ -144,7 +163,10 @@ export function validateAppManifest(value: unknown): {
     issues.push({ path: "deploy", message: "must be an object" });
   } else {
     const strategy = checkString("deploy.strategy", deployValue.strategy);
-    if (strategy && !SUPPORTED_DEPLOY_STRATEGIES.includes(strategy as DeployStrategy)) {
+    if (
+      strategy &&
+      !SUPPORTED_DEPLOY_STRATEGIES.includes(strategy as DeployStrategy)
+    ) {
       issues.push({
         path: "deploy.strategy",
         message: `must be one of: ${SUPPORTED_DEPLOY_STRATEGIES.join(", ")}`,
@@ -153,7 +175,10 @@ export function validateAppManifest(value: unknown): {
 
     let workingDirectory: string | undefined;
     if (deployValue.workingDirectory !== undefined) {
-      workingDirectory = checkString("deploy.workingDirectory", deployValue.workingDirectory);
+      workingDirectory = checkString(
+        "deploy.workingDirectory",
+        deployValue.workingDirectory,
+      );
     }
 
     if (strategy) {

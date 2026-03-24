@@ -39,3 +39,6 @@ jobs:
 
       - name: Runtime smoke verification
         run: pnpm smoke:runtime
+
+      - name: Playbook resolution smoke verification
+        run: pnpm smoke:playbook

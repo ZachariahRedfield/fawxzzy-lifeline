@@ -1,5 +1,5 @@
-import { open } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { open } from "node:fs/promises";
 
 import { ProcessManagerError } from "./errors.js";
 
@@ -18,7 +18,9 @@ function isWindows(): boolean {
   return process.platform === "win32";
 }
 
-export async function runForegroundCommand(options: RunCommandOptions): Promise<void> {
+export async function runForegroundCommand(
+  options: RunCommandOptions,
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn(options.command, {
       cwd: options.cwd,
@@ -28,7 +30,11 @@ export async function runForegroundCommand(options: RunCommandOptions): Promise<
     });
 
     child.on("error", (error) => {
-      reject(new ProcessManagerError(`Failed to start ${options.label}: ${error.message}`));
+      reject(
+        new ProcessManagerError(
+          `Failed to start ${options.label}: ${error.message}`,
+        ),
+      );
     });
 
     child.on("exit", (code, signal) => {
@@ -46,7 +52,9 @@ export async function runForegroundCommand(options: RunCommandOptions): Promise<
   });
 }
 
-export async function startBackgroundProcess(options: StartBackgroundOptions): Promise<number> {
+export async function startBackgroundProcess(
+  options: StartBackgroundOptions,
+): Promise<number> {
   const logHandle = await open(options.logPath, "a");
 
   return await new Promise<number>((resolve, reject) => {
@@ -60,14 +68,22 @@ export async function startBackgroundProcess(options: StartBackgroundOptions): P
 
     child.on("error", async (error) => {
       await logHandle.close();
-      reject(new ProcessManagerError(`Failed to start ${options.label}: ${error.message}`));
+      reject(
+        new ProcessManagerError(
+          `Failed to start ${options.label}: ${error.message}`,
+        ),
+      );
     });
 
     child.on("spawn", async () => {
       child.unref();
       await logHandle.close();
       if (!child.pid) {
-        reject(new ProcessManagerError(`Failed to start ${options.label}: missing pid.`));
+        reject(
+          new ProcessManagerError(
+            `Failed to start ${options.label}: missing pid.`,
+          ),
+        );
         return;
       }
       resolve(child.pid);
@@ -95,13 +111,23 @@ export async function stopProcess(pid: number): Promise<void> {
         shell: true,
         stdio: "ignore",
       });
-      child.on("error", (error) => reject(new ProcessManagerError(`Failed to stop pid ${pid}: ${error.message}`)));
+      child.on("error", (error) =>
+        reject(
+          new ProcessManagerError(
+            `Failed to stop pid ${pid}: ${error.message}`,
+          ),
+        ),
+      );
       child.on("exit", (code) => {
         if (code === 0 || code === 128) {
           resolve();
           return;
         }
-        reject(new ProcessManagerError(`taskkill failed for pid ${pid} with exit code ${code ?? "unknown"}.`));
+        reject(
+          new ProcessManagerError(
+            `taskkill failed for pid ${pid} with exit code ${code ?? "unknown"}.`,
+          ),
+        );
       });
     });
     return;
@@ -113,7 +139,8 @@ export async function stopProcess(pid: number): Promise<void> {
     try {
       process.kill(pid, "SIGTERM");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "unknown stop error";
+      const message =
+        error instanceof Error ? error.message : "unknown stop error";
       throw new ProcessManagerError(`Failed to stop pid ${pid}: ${message}`);
     }
   }
@@ -132,8 +159,11 @@ export async function stopProcess(pid: number): Promise<void> {
     try {
       process.kill(pid, "SIGKILL");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "unknown kill error";
-      throw new ProcessManagerError(`Failed to force stop pid ${pid}: ${message}`);
+      const message =
+        error instanceof Error ? error.message : "unknown kill error";
+      throw new ProcessManagerError(
+        `Failed to force stop pid ${pid}: ${message}`,
+      );
     }
   }
 }

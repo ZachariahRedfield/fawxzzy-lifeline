@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { runDownCommand } from "./commands/down.js";
 import { runLogsCommand } from "./commands/logs.js";
+import { runResolveCommand } from "./commands/resolve.js";
 import { runRestartCommand } from "./commands/restart.js";
 import { runStatusCommand } from "./commands/status.js";
 import { runUpCommand } from "./commands/up.js";
@@ -8,11 +9,50 @@ import { runValidateCommand } from "./commands/validate.js";
 import { LifelineError } from "./core/errors.js";
 
 function printUsage(): void {
-  console.log(`Lifeline v1\n\nUsage:\n  lifeline validate <manifest-path>\n  lifeline up <manifest-path>\n  lifeline down <app-name>\n  lifeline status <app-name>\n  lifeline logs <app-name> [line-count]\n  lifeline restart <app-name>`);
+  console.log(
+    "Lifeline v1\n\nUsage:\n  lifeline validate <manifest-path> [--playbook-path <path>]\n  lifeline resolve <manifest-path> [--playbook-path <path>]\n  lifeline up <manifest-path> [--playbook-path <path>]\n  lifeline down <app-name>\n  lifeline status <app-name>\n  lifeline logs <app-name> [line-count]\n  lifeline restart <app-name> [--playbook-path <path>]",
+  );
+}
+
+function parsePlaybookOption(args: string[]): {
+  target?: string | undefined;
+  option?: string | undefined;
+  playbookPath?: string | undefined;
+} {
+  const positional: string[] = [];
+  let playbookPath: string | undefined;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (!arg) {
+      continue;
+    }
+
+    if (arg === "--playbook-path") {
+      const nextArg = args[index + 1];
+      if (!nextArg) {
+        throw new LifelineError(
+          "Missing value for --playbook-path.",
+          "CLI_ARGUMENT_ERROR",
+        );
+      }
+      playbookPath = nextArg;
+      index += 1;
+      continue;
+    }
+    positional.push(arg);
+  }
+
+  return {
+    target: positional[0],
+    option: positional[1],
+    ...(playbookPath ? { playbookPath } : {}),
+  };
 }
 
 async function main(argv: string[]): Promise<number> {
-  const [command, target, option] = argv;
+  const [command, ...rest] = argv;
+  const { target, option, playbookPath } = parsePlaybookOption(rest);
 
   if (!command || command === "--help" || command === "-h") {
     printUsage();
@@ -26,14 +66,21 @@ async function main(argv: string[]): Promise<number> {
         printUsage();
         return 1;
       }
-      return runValidateCommand(target);
+      return runValidateCommand(target, playbookPath);
+    case "resolve":
+      if (!target) {
+        console.error("Missing manifest path.");
+        printUsage();
+        return 1;
+      }
+      return runResolveCommand(target, playbookPath);
     case "up":
       if (!target) {
         console.error("Missing manifest path.");
         printUsage();
         return 1;
       }
-      return runUpCommand(target);
+      return runUpCommand(target, playbookPath);
     case "down":
       if (!target) {
         console.error("Missing app name.");
@@ -67,7 +114,7 @@ async function main(argv: string[]): Promise<number> {
         printUsage();
         return 1;
       }
-      return runRestartCommand(target);
+      return runRestartCommand(target, playbookPath);
     default:
       console.error(`Unknown command: ${command}`);
       printUsage();

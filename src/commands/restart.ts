@@ -1,8 +1,11 @@
+import { getAppState } from "../core/state-store.js";
 import { runDownCommand } from "./down.js";
 import { runUpCommand } from "./up.js";
-import { getAppState } from "../core/state-store.js";
 
-export async function runRestartCommand(appName: string): Promise<number> {
+export async function runRestartCommand(
+  appName: string,
+  playbookPath?: string,
+): Promise<number> {
   const state = await getAppState(appName);
   if (!state) {
     console.error(`No runtime state found for app ${appName}.`);
@@ -14,5 +17,5 @@ export async function runRestartCommand(appName: string): Promise<number> {
     return downCode;
   }
 
-  return runUpCommand(state.manifestPath);
+  return runUpCommand(state.manifestPath, playbookPath ?? state.playbookPath);
 }

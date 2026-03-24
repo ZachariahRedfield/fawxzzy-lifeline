@@ -2,15 +2,16 @@ import { spawn } from "node:child_process";
 import process from "node:process";
 
 const cli = ["node", "dist/cli.js"];
+const playbookPath = "fixtures/playbook-export";
 const manifestPath =
-  "fixtures/runtime-smoke-app/runtime-smoke-app.lifeline.yml";
+  "fixtures/runtime-smoke-app/runtime-smoke-app.playbook.lifeline.yml";
 const appName = "runtime-smoke-app";
 
-function run(args, { allowFailure = false } = {}) {
+function run(args, { allowFailure = false, env = process.env } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(cli[0], [...cli.slice(1), ...args], {
       stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
+      env,
     });
 
     let stdout = "";
@@ -43,7 +44,21 @@ async function cleanup() {
 
 try {
   await cleanup();
-  await run(["up", manifestPath]);
+
+  const resolveOutput = await run([
+    "resolve",
+    manifestPath,
+    "--playbook-path",
+    playbookPath,
+  ]);
+  if (!resolveOutput.stdout.includes('"installCommand": "node -e')) {
+    throw new Error(
+      `Expected resolved defaults in output, got:\n${resolveOutput.stdout}\n${resolveOutput.stderr}`,
+    );
+  }
+
+  await run(["validate", manifestPath, "--playbook-path", playbookPath]);
+  await run(["up", manifestPath, "--playbook-path", playbookPath]);
 
   const status = await run(["status", appName]);
   if (!status.stdout.includes("is running")) {
@@ -52,19 +67,17 @@ try {
     );
   }
 
-  const logs = await run(["logs", appName, "20"]);
-  if (!logs.stdout.includes("runtime-smoke-app listening on 4310")) {
-    throw new Error(
-      `Expected runtime log line, got:\n${logs.stdout}\n${logs.stderr}`,
-    );
-  }
-
   await run(["restart", appName]);
 
-  const statusAfterRestart = await run(["status", appName]);
-  if (!statusAfterRestart.stdout.includes("is running")) {
+  const envResolve = await run(["resolve", manifestPath], {
+    env: {
+      ...process.env,
+      LIFELINE_PLAYBOOK_PATH: playbookPath,
+    },
+  });
+  if (!envResolve.stdout.includes('"healthcheckPath": "/healthz"')) {
     throw new Error(
-      `Expected running status after restart, got:\n${statusAfterRestart.stdout}\n${statusAfterRestart.stderr}`,
+      `Expected env fallback resolution output, got:\n${envResolve.stdout}\n${envResolve.stderr}`,
     );
   }
 

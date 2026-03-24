@@ -11,7 +11,7 @@ function stripComment(line: string): string {
   for (let index = 0; index < line.length; index += 1) {
     const char = line[index];
     if ((char === '"' || char === "'") && !escaped) {
-      quote = quote === char ? undefined : quote ?? char;
+      quote = quote === char ? undefined : (quote ?? char);
     }
 
     if (char === "#" && !quote) {
@@ -29,7 +29,10 @@ function parseScalar(value: string): unknown {
     return Number(value);
   }
 
-  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
     return value.slice(1, -1);
   }
 
@@ -38,7 +41,9 @@ function parseScalar(value: string): unknown {
 
 export function parseSimpleYaml(source: string): unknown {
   const root: Record<string, unknown> = {};
-  const stack: Array<{ indent: number; container: Container }> = [{ indent: -1, container: root }];
+  const stack: Array<{ indent: number; container: Container }> = [
+    { indent: -1, container: root },
+  ];
 
   const lines = source.split(/\r?\n/);
 
@@ -52,18 +57,26 @@ export function parseSimpleYaml(source: string): unknown {
     const indent = withoutComment.match(/^\s*/)?.[0].length ?? 0;
     const line = withoutComment.trim();
 
-    while (stack.length > 1 && indent <= stack[stack.length - 1]!.indent) {
+    while (stack.length > 1) {
+      const current = stack[stack.length - 1];
+      if (!current || indent > current.indent) {
+        break;
+      }
       stack.pop();
     }
 
     const parent = stack[stack.length - 1]?.container;
     if (!parent) {
-      throw new ManifestLoadError(`Invalid YAML structure near line ${lineNumber + 1}`);
+      throw new ManifestLoadError(
+        `Invalid YAML structure near line ${lineNumber + 1}`,
+      );
     }
 
     if (line.startsWith("- ")) {
       if (!Array.isArray(parent)) {
-        throw new ManifestLoadError(`List item without list parent near line ${lineNumber + 1}`);
+        throw new ManifestLoadError(
+          `List item without list parent near line ${lineNumber + 1}`,
+        );
       }
 
       parent.push(parseScalar(line.slice(2).trim()));
@@ -72,14 +85,18 @@ export function parseSimpleYaml(source: string): unknown {
 
     const separatorIndex = line.indexOf(":");
     if (separatorIndex === -1) {
-      throw new ManifestLoadError(`Expected key/value pair near line ${lineNumber + 1}`);
+      throw new ManifestLoadError(
+        `Expected key/value pair near line ${lineNumber + 1}`,
+      );
     }
 
     const key = line.slice(0, separatorIndex).trim();
     const remainder = line.slice(separatorIndex + 1).trim();
 
     if (Array.isArray(parent)) {
-      throw new ManifestLoadError(`Unexpected mapping inside list near line ${lineNumber + 1}`);
+      throw new ManifestLoadError(
+        `Unexpected mapping inside list near line ${lineNumber + 1}`,
+      );
     }
 
     if (remainder.length > 0) {
@@ -112,8 +129,11 @@ export async function loadManifestFile(path: string): Promise<unknown> {
   try {
     raw = await readFile(path, "utf8");
   } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown read error";
-    throw new ManifestLoadError(`Could not read manifest at ${path}: ${message}`);
+    const message =
+      error instanceof Error ? error.message : "unknown read error";
+    throw new ManifestLoadError(
+      `Could not read manifest at ${path}: ${message}`,
+    );
   }
 
   try {
@@ -123,7 +143,8 @@ export async function loadManifestFile(path: string): Promise<unknown> {
       throw error;
     }
 
-    const message = error instanceof Error ? error.message : "unknown parse error";
+    const message =
+      error instanceof Error ? error.message : "unknown parse error";
     throw new ManifestLoadError(`Could not parse YAML in ${path}: ${message}`);
   }
 }
