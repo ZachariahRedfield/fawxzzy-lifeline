@@ -3,12 +3,6 @@ buildCommand: node -e "console.log('build ok')"
 startCommand: node server.js
 port: 4310
 healthcheckPath: /healthz
-env:
-  mode: file
-  file: .env.runtime
-  requiredKeys:
-    - PORT
-    - SMOKE_TOKEN
 deploy:
   strategy: rebuild
   workingDirectory: .

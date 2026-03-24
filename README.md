@@ -82,11 +82,13 @@ Resolution is intentionally small and explicit:
 3. explicit manifest values always win
 
 Lifeline only merges known top-level manifest fields plus the nested `env` and `deploy` sections. It does not perform arbitrary deep-merge magic.
+Playbook archetype exports may omit `env` defaults; in that case, env requirements must come from explicit manifest values.
 
 ## Validation and resolution behavior
 
 - `lifeline validate <manifest>` validates the raw manifest structure only.
 - `lifeline validate <manifest> --playbook-path <path>` validates the resolved config, so required runtime fields may come from Playbook defaults.
+- Lifeline does not require every optional producer section in Playbook exports. It validates the final resolved config after defaults+manifest merge.
 - `lifeline resolve <manifest>` prints the fully resolved config that Lifeline would execute.
 - `lifeline up` and `lifeline restart` use the same resolution path as `resolve`.
 - If an app was started with Playbook defaults, Lifeline stores the resolved Playbook path in `.lifeline/state.json` so `restart` remains deterministic without retyping flags.

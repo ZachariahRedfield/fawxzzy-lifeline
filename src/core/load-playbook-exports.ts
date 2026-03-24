@@ -19,9 +19,8 @@ export type PlaybookArchetypeDefaults = Pick<
   | "startCommand"
   | "port"
   | "healthcheckPath"
-  | "env"
   | "deploy"
->;
+> & { env?: AppManifest["env"] };
 
 export interface PlaybookExports {
   playbookPath: string;
@@ -237,9 +236,9 @@ export async function loadPlaybookArchetypeDefaults(
   }
 
   const envValue = parsed.env;
-  if (!isRecord(envValue)) {
+  if (envValue !== undefined && !isRecord(envValue)) {
     throw new ValidationError(
-      `Playbook archetype export ${archetypePath} is missing env defaults.`,
+      `Playbook export field env must be an object when present.`,
     );
   }
 
@@ -262,18 +261,18 @@ export async function loadPlaybookArchetypeDefaults(
     );
   }
 
-  const envMode = assertNonEmptyString(
-    "env.mode",
-    envValue.mode,
-  ) as AppManifest["env"]["mode"];
+  const envMode =
+    envValue === undefined
+      ? undefined
+      : (assertNonEmptyString("env.mode", envValue.mode) as AppManifest["env"]["mode"]);
   const envFile =
-    envValue.file === undefined
+    envValue === undefined || envValue.file === undefined
       ? undefined
       : assertNonEmptyString("env.file", envValue.file);
-  const requiredKeys = assertStringArray(
-    "env.requiredKeys",
-    envValue.requiredKeys ?? envValue.required,
-  );
+  const requiredKeys =
+    envValue === undefined
+      ? undefined
+      : assertStringArray("env.requiredKeys", envValue.requiredKeys ?? envValue.required);
   const strategy = assertNonEmptyString(
     "deploy.strategy",
     deployValue.strategy,
@@ -298,11 +297,15 @@ export async function loadPlaybookArchetypeDefaults(
       "healthcheckPath",
       parsed.healthcheckPath,
     ),
-    env: {
-      mode: envMode,
-      ...(envFile ? { file: envFile } : {}),
-      requiredKeys,
-    },
+    ...(envValue
+      ? {
+          env: {
+            mode: envMode as AppManifest["env"]["mode"],
+            ...(envFile ? { file: envFile } : {}),
+            requiredKeys: requiredKeys as string[],
+          },
+        }
+      : {}),
     deploy: {
       strategy,
       ...(workingDirectory ? { workingDirectory } : {}),

@@ -2,3 +2,9 @@ name: runtime-smoke-app
 archetype: node-web
 repo: local-fixture
 branch: main
+env:
+  mode: file
+  file: .env.runtime
+  requiredKeys:
+    - PORT
+    - SMOKE_TOKEN
