@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import http from "node:http";
+import net from "node:net";
 import process from "node:process";
 
 const cli = ["node", "dist/cli.js"];
@@ -74,6 +75,16 @@ function isPidAlive(pid) {
   } catch {
     return false;
   }
+}
+
+function canBindPort(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.listen(port, "127.0.0.1", () => {
+      server.close(() => resolve(true));
+    });
+  });
 }
 
 async function readRuntimeState() {
@@ -203,6 +214,23 @@ try {
   }
 
   await run(["down", appName]);
+
+  const statusAfterDown = await run(["status", appName], { allowFailure: true });
+  if (!statusAfterDown.stdout.includes("App runtime-smoke-app is stopped.")) {
+    throw new Error(
+      `Expected stopped status after down, got:\n${statusAfterDown.stdout}\n${statusAfterDown.stderr}`,
+    );
+  }
+  if (!statusAfterDown.stdout.includes("- portOwner: none")) {
+    throw new Error(
+      `Expected no port owner after down, got:\n${statusAfterDown.stdout}\n${statusAfterDown.stderr}`,
+    );
+  }
+
+  const portReleased = await canBindPort(runtimePort);
+  if (!portReleased) {
+    throw new Error(`Expected port ${runtimePort} to be released after down`);
+  }
 } catch (error) {
   await cleanup();
   throw error;

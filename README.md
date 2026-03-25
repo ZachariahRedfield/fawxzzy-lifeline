@@ -115,6 +115,7 @@ Playbook archetype exports are sparse optional default bundles. They may omit an
 - appends app output and supervisor lifecycle events to `.lifeline/logs/<app-name>.log`
 - stores supervisor pid, wrapper child pid, and tracked listener pid/port ownership metadata in `.lifeline/state.json`
 - polls `http://127.0.0.1:<port><healthcheckPath>` for a simple health check and reports blocked/unhealthy states when restart cannot reclaim the managed port
+- `lifeline down` reclaims the real managed listener and waits for managed port release before reporting success
 - supports `lifeline restore` to restart restorable apps from persisted state
 
 ## Slim manifest example with Playbook defaults

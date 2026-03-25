@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { open } from "node:fs/promises";
+import { open, readdir, readFile, readlink } from "node:fs/promises";
+import { createConnection } from "node:net";
 
 import { ProcessManagerError } from "./errors.js";
 
@@ -42,6 +43,84 @@ async function runCapture(
       resolve({ code, stdout, stderr });
     });
   });
+}
+
+async function findListeningPortOwnerPidFromProc(
+  port: number,
+): Promise<number | undefined> {
+  const parseListeningInodes = async (
+    tablePath: string,
+  ): Promise<Set<string>> => {
+    const raw = await readFile(tablePath, "utf8").catch(() => "");
+    if (!raw) {
+      return new Set<string>();
+    }
+
+    const lines = raw.split(/\r?\n/).slice(1);
+    const targetPortHex = port.toString(16).toUpperCase().padStart(4, "0");
+    const inodes = new Set<string>();
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        continue;
+      }
+      const parts = trimmed.split(/\s+/);
+      if (parts.length < 10) {
+        continue;
+      }
+      const localAddress = parts[1] ?? "";
+      const state = parts[3];
+      const inode = parts[9];
+      const localPortHex = localAddress.split(":")[1]?.toUpperCase();
+      if (state === "0A" && localPortHex === targetPortHex && inode) {
+        inodes.add(inode);
+      }
+    }
+
+    return inodes;
+  };
+
+  const inodes = new Set<string>([
+    ...(await parseListeningInodes("/proc/net/tcp")),
+    ...(await parseListeningInodes("/proc/net/tcp6")),
+  ]);
+  if (inodes.size === 0) {
+    return undefined;
+  }
+
+  const procEntries = await readdir("/proc", { withFileTypes: true }).catch(
+    () => [],
+  );
+  for (const entry of procEntries) {
+    if (
+      typeof entry === "string" ||
+      !entry.isDirectory() ||
+      !/^\d+$/.test(entry.name)
+    ) {
+      continue;
+    }
+
+    const pid = Number(entry.name);
+    if (!Number.isInteger(pid) || pid <= 0) {
+      continue;
+    }
+
+    const fdDir = `/proc/${entry.name}/fd`;
+    const fdEntries = await readdir(fdDir).catch(() => []);
+    for (const fdEntry of fdEntries) {
+      if (typeof fdEntry !== "string") {
+        continue;
+      }
+      const target = await readlink(`${fdDir}/${fdEntry}`).catch(() => "");
+      const match = target.match(/^socket:\[(\d+)\]$/);
+      if (match?.[1] && inodes.has(match[1])) {
+        return pid;
+      }
+    }
+  }
+
+  return undefined;
 }
 
 export async function runForegroundCommand(
@@ -214,23 +293,25 @@ export async function findListeningPortOwnerPid(
 
   const ss = await runCapture("ss", ["-ltnp"])
     .catch(() => ({ code: 1, stdout: "", stderr: "" }));
-  if (ss.code !== 0) {
-    return undefined;
+  if (ss.code === 0) {
+    const lines = ss.stdout.split(/\r?\n/);
+    for (const line of lines) {
+      if (!line.includes(`:${port}`)) {
+        continue;
+      }
+      const pidMatch = line.match(/pid=(\d+)/);
+      if (!pidMatch) {
+        continue;
+      }
+      const pid = Number(pidMatch[1]);
+      if (Number.isInteger(pid) && pid > 0) {
+        return pid;
+      }
+    }
   }
 
-  const lines = ss.stdout.split(/\r?\n/);
-  for (const line of lines) {
-    if (!line.includes(`:${port}`)) {
-      continue;
-    }
-    const pidMatch = line.match(/pid=(\d+)/);
-    if (!pidMatch) {
-      continue;
-    }
-    const pid = Number(pidMatch[1]);
-    if (Number.isInteger(pid) && pid > 0) {
-      return pid;
-    }
+  if (process.platform === "linux") {
+    return await findListeningPortOwnerPidFromProc(port);
   }
 
   return undefined;
@@ -240,16 +321,42 @@ export async function waitForPortToClear(
   port: number,
   timeoutMs = 8_000,
 ): Promise<boolean> {
+  async function isPortListening(targetPort: number): Promise<boolean> {
+    return await new Promise<boolean>((resolve) => {
+      const socket = createConnection({
+        host: "127.0.0.1",
+        port: targetPort,
+      });
+
+      const finalize = (listening: boolean) => {
+        socket.destroy();
+        resolve(listening);
+      };
+
+      socket.setTimeout(300);
+      socket.once("connect", () => finalize(true));
+      socket.once("timeout", () => finalize(false));
+      socket.once("error", () => {
+        finalize(false);
+      });
+    });
+  }
+
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const ownerPid = await findListeningPortOwnerPid(port);
-    if (!ownerPid) {
+    if (!ownerPid && !(await isPortListening(port))) {
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
-  return (await findListeningPortOwnerPid(port)) === undefined;
+  const ownerPid = await findListeningPortOwnerPid(port);
+  if (ownerPid) {
+    return false;
+  }
+
+  return !(await isPortListening(port));
 }
 
 export async function stopProcess(pid: number): Promise<void> {

@@ -24,6 +24,19 @@ declare module "node:fs/promises" {
     appendFile(data: string): Promise<void>;
     close(): Promise<void>;
   }>;
+  export function readdir(
+    path: string,
+    options?: { withFileTypes?: boolean },
+  ): Promise<
+    Array<
+      | string
+      | {
+          name: string;
+          isDirectory(): boolean;
+        }
+    >
+  >;
+  export function readlink(path: string): Promise<string>;
 }
 
 declare module "node:fs" {
@@ -77,6 +90,17 @@ declare module "node:child_process" {
     args: string[],
     options?: SpawnOptions,
   ): ChildProcess;
+}
+
+declare module "node:net" {
+  export function createConnection(options: {
+    host: string;
+    port: number;
+  }): {
+    once(event: "connect" | "timeout" | "error", listener: () => void): void;
+    setTimeout(timeoutMs: number): void;
+    destroy(): void;
+  };
 }
 
 declare const console: {

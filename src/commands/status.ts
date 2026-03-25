@@ -27,7 +27,13 @@ export async function runStatusCommand(appName: string): Promise<number> {
     : false;
 
   if (!supervisorAlive) {
-    state.lastKnownStatus = state.crashLoopDetected ? "crash-loop" : "stopped";
+    if (portOwnerPid) {
+      state.lastKnownStatus = "blocked";
+      state.blockedReason = `port ${state.port} occupied by pid ${portOwnerPid}`;
+    } else {
+      state.lastKnownStatus = state.crashLoopDetected ? "crash-loop" : "stopped";
+      state.blockedReason = undefined;
+    }
   }
 
   const shouldCheckHealth = Boolean(portOwnerPid || managedChildAlive);
