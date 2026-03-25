@@ -12,10 +12,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.5
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
-      - run: pnpm playbook verify --ci
+
+      # Canonical Playbook verification path in this repo: resolve+merge smoke checks.
+      - run: pnpm smoke:playbook

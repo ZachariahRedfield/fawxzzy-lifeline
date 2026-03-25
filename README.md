@@ -155,6 +155,8 @@ pnpm smoke:runtime
 pnpm smoke:playbook
 ```
 
+CI uses the same canonical Playbook verification path: `pnpm smoke:playbook`.
+
 ## Early target manifests
 
 The fitness app and Playbook UI remain early Lifeline targets. Their manifests continue to document the shared contract shape, but actual runtime execution requires a valid local `deploy.workingDirectory` on the machine where Lifeline runs. Their application code does not live in this repository.
