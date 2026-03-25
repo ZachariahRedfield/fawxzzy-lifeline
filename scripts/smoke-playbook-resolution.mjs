@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
 
-const cli = ["node", "dist/cli.js"];
+const packageManagerExecutable = process.platform === "win32"
+  ? "pnpm.cmd"
+  : "pnpm";
+const packageManagerArgs = ["lifeline"];
 const fixturePlaybookPath = "fixtures/playbook-export";
 const manifestPath =
   "fixtures/runtime-smoke-app/runtime-smoke-app.playbook.lifeline.yml";
@@ -12,7 +15,7 @@ const appName = "runtime-smoke-app";
 
 function run(args, { allowFailure = false, env = process.env } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(cli[0], [...cli.slice(1), ...args], {
+    const child = spawn(packageManagerExecutable, [...packageManagerArgs, ...args], {
       stdio: ["ignore", "pipe", "pipe"],
       env,
     });

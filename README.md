@@ -113,8 +113,8 @@ Playbook archetype exports are sparse optional default bundles. They may omit an
 - starts a detached Lifeline supervisor for the app
 - supervisor starts `startCommand`, watches exits, and restarts on failures with bounded backoff
 - appends app output and supervisor lifecycle events to `.lifeline/logs/<app-name>.log`
-- stores supervisor pid, wrapper child pid, and tracked listener pid/port ownership metadata in `.lifeline/state.json`
-- polls `http://127.0.0.1:<port><healthcheckPath>` for a simple health check and reports blocked/unhealthy states when restart cannot reclaim the managed port
+- stores supervisor + child runtime state in `.lifeline/state.json`
+- polls `http://127.0.0.1:<port><healthcheckPath>` for a simple health check
 - supports `lifeline restore` to restart restorable apps from persisted state
 
 ## Slim manifest example with Playbook defaults
@@ -157,7 +157,7 @@ pnpm smoke:playbook
 
 CI uses the same canonical Playbook verification path: `pnpm smoke:playbook`.
 
-Playbook smoke invokes the canonical local Lifeline CLI entrypoint (`node dist/cli.js`) and therefore requires `pnpm build` beforehand so `dist/cli.js` exists.
+Playbook smoke invokes the canonical local Lifeline CLI script via `pnpm lifeline` and therefore requires `pnpm build` beforehand so `dist/cli.js` exists.
 
 ## Early target manifests
 

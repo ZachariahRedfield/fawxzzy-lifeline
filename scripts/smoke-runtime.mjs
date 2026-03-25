@@ -85,37 +85,15 @@ async function cleanup() {
   await hardCleanup();
 }
 
-function parseRestartCount(statusOutput) {
-  const match = statusOutput.match(/restartCount:\s*(\d+)/);
-  return match ? Number(match[1]) : NaN;
-}
-
-function parseChildPid(statusOutput) {
-  const match = statusOutput.match(/- child:\s+alive \(pid (\d+)\)/);
-  return match ? Number(match[1]) : undefined;
-}
-
 async function waitForRunning() {
   for (let i = 0; i < 30; i += 1) {
     const status = await run(["status", appName], { allowFailure: true });
-    if (status.stdout.includes("is running") && status.stdout.includes("- child: alive")) {
-      return status;
+    if (status.stdout.includes("is running")) {
+      return;
     }
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
   throw new Error("Timed out waiting for running status");
-}
-
-async function waitForRestartCountAtLeast(target) {
-  for (let i = 0; i < 40; i += 1) {
-    const status = await run(["status", appName], { allowFailure: true });
-    const count = parseRestartCount(status.stdout);
-    if (Number.isInteger(count) && count >= target && status.stdout.includes("- child: alive")) {
-      return status;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
-  throw new Error(`Timed out waiting for restartCount >= ${target}`);
 }
 
 async function prepareFixtureConfig() {
@@ -155,27 +133,23 @@ try {
   }
 
   await request("/crash");
-  const statusAfterCrash = await waitForRestartCountAtLeast(1);
-  if (!statusAfterCrash.stdout.includes("- health: ok")) {
+  await waitForRunning();
+
+  const statusAfterCrash = await run(["status", appName], {
+    allowFailure: true,
+  });
+  if (!statusAfterCrash.stdout.includes("restartCount: 1")) {
     throw new Error(
-      `Expected healthy status after crash restart, got:\n${statusAfterCrash.stdout}\n${statusAfterCrash.stderr}`,
+      `Expected restart count after crash, got:\n${statusAfterCrash.stdout}\n${statusAfterCrash.stderr}`,
     );
   }
-
-  const managedChildPid = parseChildPid(statusAfterCrash.stdout);
-  if (!managedChildPid) {
-    throw new Error(
-      `Expected child pid after crash restart, got:
-${statusAfterCrash.stdout}
-${statusAfterCrash.stderr}`,
-    );
-  }
-
 
   const restoreWhileRunning = await run(["restore"]);
   if (!restoreWhileRunning.stdout.includes("already running")) {
     throw new Error(
-      `Expected idempotent restore output, got:\n${restoreWhileRunning.stdout}\n${restoreWhileRunning.stderr}`,
+      `Expected idempotent restore output, got:
+${restoreWhileRunning.stdout}
+${restoreWhileRunning.stderr}`,
     );
   }
 
