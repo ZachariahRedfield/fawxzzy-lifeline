@@ -56,14 +56,10 @@ async function ensurePortReadyForRestart(
     `[supervisor] ${new Date().toISOString()} detected port ${latest.port} still occupied by pid ${ownerPid} before restart`,
   );
 
-  if (
-    latest.listenerPid &&
-    ownerPid === latest.listenerPid &&
-    (await isProcessAlive(ownerPid))
-  ) {
+  if (latest.childPid && ownerPid === latest.childPid && (await isProcessAlive(ownerPid))) {
     await appendLogHeader(
       latest.logPath,
-      `[supervisor] ${new Date().toISOString()} stopping stale listener pid ${ownerPid} before restart`,
+      `[supervisor] ${new Date().toISOString()} stopping stale managed child pid ${ownerPid} before restart`,
     );
     await stopProcess(ownerPid);
   }
@@ -78,6 +74,53 @@ async function ensurePortReadyForRestart(
     ? `Port ${latest.port} is still occupied by pid ${blockedOwner}`
     : `Port ${latest.port} did not clear in ${PORT_CLEAR_TIMEOUT_MS}ms`;
   return { ok: false, blockedReason };
+}
+
+async function waitForManagedExit(options: {
+  wrapperPid: number;
+  listenerPid: number | undefined;
+  childExit: Promise<{ code: number | null; signal: string | null }>;
+  logPath: string;
+  shouldStop: () => boolean;
+}): Promise<{ code: number | null; signal: string | null; source: "wrapper" | "listener" }> {
+  const wrapperExit = await options.childExit;
+
+  if (!options.listenerPid || options.listenerPid === options.wrapperPid) {
+    return {
+      ...wrapperExit,
+      source: "wrapper",
+    };
+  }
+
+  const listenerStillAlive = await isProcessAlive(options.listenerPid);
+  if (!listenerStillAlive) {
+    return {
+      ...wrapperExit,
+      source: "wrapper",
+    };
+  }
+
+  await appendLogHeader(
+    options.logPath,
+    `[supervisor] ${new Date().toISOString()} wrapper pid ${options.wrapperPid} exited while listener pid ${options.listenerPid} is still alive; monitoring listener as managed child`,
+  );
+
+  while (!options.shouldStop()) {
+    if (!(await isProcessAlive(options.listenerPid))) {
+      return {
+        code: 1,
+        signal: null,
+        source: "listener",
+      };
+    }
+    await delay(300);
+  }
+
+  return {
+    code: 0,
+    signal: "SIGTERM",
+    source: "listener",
+  };
 }
 
 export async function runSupervisor(appName: string): Promise<number> {
@@ -120,6 +163,7 @@ export async function runSupervisor(appName: string): Promise<number> {
     ...current,
     supervisorPid: process.pid,
     childPid: undefined,
+    wrapperPid: undefined,
     listenerPid: undefined,
     portOwnerPid: undefined,
     startedAt: new Date().toISOString(),
@@ -142,6 +186,7 @@ export async function runSupervisor(appName: string): Promise<number> {
       await upsertAppState({
         ...state,
         childPid: undefined,
+        wrapperPid: undefined,
         portOwnerPid: await findListeningPortOwnerPid(state.port),
         lastKnownStatus: "blocked",
         blockedReason: restartPortReady.blockedReason,
@@ -185,10 +230,13 @@ export async function runSupervisor(appName: string): Promise<number> {
     });
 
     const listenerPid = await waitForListenerPid(state.port);
+    const managedChildPid = listenerPid ?? child.pid;
+
     await upsertAppState({
       ...state,
       supervisorPid: process.pid,
-      childPid: child.pid,
+      childPid: managedChildPid,
+      wrapperPid: child.pid,
       listenerPid,
       portOwnerPid: listenerPid,
       lastKnownStatus: "running",
@@ -197,16 +245,24 @@ export async function runSupervisor(appName: string): Promise<number> {
     });
     await appendLogHeader(
       state.logPath,
-      `[supervisor] ${new Date().toISOString()} child started (wrapper pid ${child.pid}${listenerPid ? `, listener pid ${listenerPid}` : ""})`,
+      `[supervisor] ${new Date().toISOString()} child started (managed pid ${managedChildPid}, wrapper pid ${child.pid}${listenerPid ? `, listener pid ${listenerPid}` : ""})`,
     );
 
-    const exit = await new Promise<{
+    const childExit = new Promise<{
       code: number | null;
       signal: string | null;
     }>((resolve) => {
       child.on("exit", (code, signal) =>
         resolve({ code, signal: signal ?? null }),
       );
+    });
+
+    const exit = await waitForManagedExit({
+      wrapperPid: child.pid,
+      listenerPid,
+      childExit,
+      logPath: state.logPath,
+      shouldStop: () => shouldStop,
     });
 
     logClosed = true;
@@ -221,6 +277,8 @@ export async function runSupervisor(appName: string): Promise<number> {
     const nextState = {
       ...latest,
       childPid: undefined,
+      wrapperPid: undefined,
+      listenerPid: undefined,
       portOwnerPid: await findListeningPortOwnerPid(latest.port),
       lastExitCode: exit.code ?? undefined,
       lastExitAt: exitedAt,
@@ -229,7 +287,7 @@ export async function runSupervisor(appName: string): Promise<number> {
 
     await appendLogHeader(
       latest.logPath,
-      `[supervisor] ${exitedAt} child exited (${exit.signal ? `signal ${exit.signal}` : `code ${exit.code ?? "unknown"}`})`,
+      `[supervisor] ${exitedAt} managed child exited via ${exit.source} (${exit.signal ? `signal ${exit.signal}` : `code ${exit.code ?? "unknown"}`})`,
     );
 
     if (shouldStop) {

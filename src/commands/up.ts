@@ -114,6 +114,7 @@ export async function runUpCommand(
       workingDirectory: prepared.workingDirectory,
       supervisorPid: process.pid,
       childPid: undefined,
+      wrapperPid: undefined,
       listenerPid: undefined,
       portOwnerPid: undefined,
       port: prepared.manifest.port,

@@ -11,6 +11,7 @@ export interface RuntimeAppState {
   workingDirectory: string;
   supervisorPid: number;
   childPid?: number | undefined;
+  wrapperPid?: number | undefined;
   listenerPid?: number | undefined;
   portOwnerPid?: number | undefined;
   port: number;
