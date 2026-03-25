@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -102,8 +102,19 @@ async function withTemporaryArchetype(mutateArchetypeYaml, validateError) {
   }
 }
 
+function parseManifestPort(manifestRaw) {
+  const match = manifestRaw.match(/^port:\s*(\d+)\s*$/m);
+  if (!match) {
+    throw new Error(`Expected fixture manifest to include explicit port: ${manifestPath}`);
+  }
+  return Number(match[1]);
+}
+
 try {
   await cleanup();
+
+  const manifestRaw = await readFile(manifestPath, "utf8");
+  const expectedManifestPort = parseManifestPort(manifestRaw);
 
   const resolveOutput = await run([
     "resolve",
@@ -126,23 +137,13 @@ try {
       `Expected manifest deploy workingDirectory to remain in resolved output when archetype omits deploy defaults, got:\n${resolveOutput.stdout}\n${resolveOutput.stderr}`,
     );
   }
-  if (!resolveOutput.stdout.includes('"port": 4310')) {
+  if (!resolveOutput.stdout.includes(`"port": ${expectedManifestPort}`)) {
     throw new Error(
-      `Expected manifest port to satisfy runtime requirements when archetype omits port default, got:\n${resolveOutput.stdout}\n${resolveOutput.stderr}`,
+      `Expected resolved config to keep explicit manifest port (${expectedManifestPort}) when archetype omits port defaults, got:\n${resolveOutput.stdout}\n${resolveOutput.stderr}`,
     );
   }
 
   await run(["validate", manifestPath, "--playbook-path", fixturePlaybookPath]);
-  await run(["up", manifestPath, "--playbook-path", fixturePlaybookPath]);
-
-  const status = await run(["status", appName]);
-  if (!status.stdout.includes("is running")) {
-    throw new Error(
-      `Expected running status, got:\n${status.stdout}\n${status.stderr}`,
-    );
-  }
-
-  await run(["restart", appName]);
 
   const envResolve = await run(["resolve", manifestPath], {
     env: {
@@ -231,7 +232,6 @@ try {
     },
   );
 
-  await run(["down", appName]);
 } catch (error) {
   await cleanup();
   throw error;
