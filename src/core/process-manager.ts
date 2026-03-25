@@ -18,6 +18,32 @@ function isWindows(): boolean {
   return process.platform === "win32";
 }
 
+async function runCapture(
+  command: string,
+  args: string[],
+): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: false,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      resolve({ code, stdout, stderr });
+    });
+  });
+}
+
 export async function runForegroundCommand(
   options: RunCommandOptions,
 ): Promise<void> {
@@ -138,6 +164,94 @@ export async function isProcessAlive(pid: number): Promise<boolean> {
   }
 }
 
+export async function findListeningPortOwnerPid(
+  port: number,
+): Promise<number | undefined> {
+  if (isWindows()) {
+    const result = await runCapture("netstat", ["-ano", "-p", "tcp"]);
+    if (result.code !== 0) {
+      return undefined;
+    }
+
+    const lines = result.stdout.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.includes("LISTENING")) {
+        continue;
+      }
+      const parts = trimmed.split(/\s+/);
+      if (parts.length < 5) {
+        continue;
+      }
+      const localAddress = parts[1];
+      const pidRaw = parts[4];
+      if (!localAddress?.endsWith(`:${port}`)) {
+        continue;
+      }
+      const pid = Number(pidRaw);
+      if (Number.isInteger(pid) && pid > 0) {
+        return pid;
+      }
+    }
+
+    return undefined;
+  }
+
+  const lsof = await runCapture("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"])
+    .catch(() => ({ code: 1, stdout: "", stderr: "" }));
+  if (lsof.code === 0) {
+    const first = lsof.stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find(Boolean);
+    if (first) {
+      const pid = Number(first);
+      if (Number.isInteger(pid) && pid > 0) {
+        return pid;
+      }
+    }
+  }
+
+  const ss = await runCapture("ss", ["-ltnp"])
+    .catch(() => ({ code: 1, stdout: "", stderr: "" }));
+  if (ss.code !== 0) {
+    return undefined;
+  }
+
+  const lines = ss.stdout.split(/\r?\n/);
+  for (const line of lines) {
+    if (!line.includes(`:${port}`)) {
+      continue;
+    }
+    const pidMatch = line.match(/pid=(\d+)/);
+    if (!pidMatch) {
+      continue;
+    }
+    const pid = Number(pidMatch[1]);
+    if (Number.isInteger(pid) && pid > 0) {
+      return pid;
+    }
+  }
+
+  return undefined;
+}
+
+export async function waitForPortToClear(
+  port: number,
+  timeoutMs = 8_000,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const ownerPid = await findListeningPortOwnerPid(port);
+    if (!ownerPid) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  return (await findListeningPortOwnerPid(port)) === undefined;
+}
+
 export async function stopProcess(pid: number): Promise<void> {
   if (!(await isProcessAlive(pid))) {
     return;
@@ -146,7 +260,7 @@ export async function stopProcess(pid: number): Promise<void> {
   if (isWindows()) {
     await new Promise<void>((resolve, reject) => {
       const child = spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
-        shell: true,
+        shell: false,
         stdio: "ignore",
       });
       child.on("error", (error) =>

@@ -8,14 +8,24 @@ export async function runDownCommand(appName: string): Promise<number> {
     return 1;
   }
 
-  if (state.childPid && (await isProcessAlive(state.childPid))) {
-    await stopProcess(state.childPid);
+  const pidsToStop = [state.childPid, state.listenerPid, state.wrapperPid]
+    .filter((pid): pid is number => Number.isInteger(pid))
+    .filter((pid, index, arr) => arr.indexOf(pid) === index);
+
+  for (const pid of pidsToStop) {
+    if (await isProcessAlive(pid)) {
+      await stopProcess(pid);
+    }
   }
 
   await stopProcess(state.supervisorPid);
   await upsertAppState({
     ...state,
     childPid: undefined,
+    wrapperPid: undefined,
+    listenerPid: undefined,
+    portOwnerPid: undefined,
+    blockedReason: undefined,
     lastKnownStatus: "stopped",
     lastExitAt: new Date().toISOString(),
   });

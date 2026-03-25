@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export type RuntimeStatus = "running" | "stopped" | "unhealthy" | "crash-loop";
+export type RuntimeStatus = "running" | "stopped" | "unhealthy" | "crash-loop" | "blocked";
 export type RestartPolicy = "on-failure" | "never";
 
 export interface RuntimeAppState {
@@ -11,6 +11,9 @@ export interface RuntimeAppState {
   workingDirectory: string;
   supervisorPid: number;
   childPid?: number | undefined;
+  wrapperPid?: number | undefined;
+  listenerPid?: number | undefined;
+  portOwnerPid?: number | undefined;
   port: number;
   healthcheckPath: string;
   logPath: string;
@@ -22,6 +25,7 @@ export interface RuntimeAppState {
   lastExitAt?: string | undefined;
   restorable: boolean;
   crashLoopDetected: boolean;
+  blockedReason?: string | undefined;
 }
 
 export interface RuntimeStateFile {

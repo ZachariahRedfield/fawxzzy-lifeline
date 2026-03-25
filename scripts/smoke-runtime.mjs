@@ -7,6 +7,7 @@ const cli = ["node", "dist/cli.js"];
 const fixtureManifestPath =
   "fixtures/runtime-smoke-app/runtime-smoke-app.lifeline.yml";
 const fixtureEnvPath = "fixtures/runtime-smoke-app/.env.runtime";
+const statePath = ".lifeline/state.json";
 const appName = "runtime-smoke-app";
 
 const runtimePort = 4500 + Math.floor(Math.random() * 2000);
@@ -62,6 +63,29 @@ function request(pathname) {
   });
 }
 
+function isPidAlive(pid) {
+  if (!pid) {
+    return false;
+  }
+
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function readRuntimeState() {
+  const raw = await readFile(statePath, "utf8").catch(() => "");
+  if (!raw) {
+    return undefined;
+  }
+
+  const parsed = JSON.parse(raw);
+  return parsed?.apps?.[appName];
+}
+
 async function hardCleanup() {
   if (process.platform === "win32") {
     return;
@@ -85,15 +109,36 @@ async function cleanup() {
   await hardCleanup();
 }
 
-async function waitForRunning() {
-  for (let i = 0; i < 30; i += 1) {
-    const status = await run(["status", appName], { allowFailure: true });
-    if (status.stdout.includes("is running")) {
-      return;
+async function waitForRuntime(predicate, label) {
+  for (let i = 0; i < 50; i += 1) {
+    const state = await readRuntimeState();
+    if (state && predicate(state)) {
+      return state;
     }
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error("Timed out waiting for running status");
+
+  const latestStatus = await run(["status", appName], { allowFailure: true });
+  throw new Error(
+    `Timed out waiting for ${label}.\nstatus:\n${latestStatus.stdout}\n${latestStatus.stderr}`,
+  );
+}
+
+async function waitForRunning() {
+  return waitForRuntime(
+    (state) =>
+      state.lastKnownStatus === "running" &&
+      state.restartCount >= 0 &&
+      isPidAlive(state.childPid),
+    "running state with live managed child",
+  );
+}
+
+async function waitForRestartCountAtLeast(target) {
+  return waitForRuntime(
+    (state) => state.restartCount >= target && isPidAlive(state.childPid),
+    `restartCount >= ${target}`,
+  );
 }
 
 async function prepareFixtureConfig() {
@@ -117,11 +162,11 @@ try {
   await cleanup();
   await run(["up", manifestPath]);
 
-  await waitForRunning();
+  const startedState = await waitForRunning();
   const status = await run(["status", appName], { allowFailure: true });
-  if (!status.stdout.includes("supervisor: alive")) {
+  if (!status.stdout.includes("supervisor: alive") || !status.stdout.includes("- child: alive")) {
     throw new Error(
-      `Expected alive supervisor in status, got:\n${status.stdout}\n${status.stderr}`,
+      `Expected alive supervisor and child in status, got:\n${status.stdout}\n${status.stderr}`,
     );
   }
 
@@ -133,23 +178,27 @@ try {
   }
 
   await request("/crash");
-  await waitForRunning();
+  const postCrashState = await waitForRestartCountAtLeast(1);
+  if (postCrashState.childPid === startedState.childPid) {
+    throw new Error(
+      `Expected managed child pid to change after restart, got same pid ${postCrashState.childPid}`,
+    );
+  }
+
 
   const statusAfterCrash = await run(["status", appName], {
     allowFailure: true,
   });
-  if (!statusAfterCrash.stdout.includes("restartCount: 1")) {
+  if (!statusAfterCrash.stdout.includes("- health: ok")) {
     throw new Error(
-      `Expected restart count after crash, got:\n${statusAfterCrash.stdout}\n${statusAfterCrash.stderr}`,
+      `Expected healthy status after crash recovery, got:\n${statusAfterCrash.stdout}\n${statusAfterCrash.stderr}`,
     );
   }
 
   const restoreWhileRunning = await run(["restore"]);
   if (!restoreWhileRunning.stdout.includes("already running")) {
     throw new Error(
-      `Expected idempotent restore output, got:
-${restoreWhileRunning.stdout}
-${restoreWhileRunning.stderr}`,
+      `Expected idempotent restore output, got:\n${restoreWhileRunning.stdout}\n${restoreWhileRunning.stderr}`,
     );
   }
 
