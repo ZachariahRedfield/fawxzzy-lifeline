@@ -1,5 +1,8 @@
+import {
+  findListeningPortOwnerPid,
+  isProcessAlive,
+} from "../core/process-manager.js";
 import { checkHealth } from "../core/healthcheck.js";
-import { isProcessAlive } from "../core/process-manager.js";
 import { getAppState, upsertAppState } from "../core/state-store.js";
 
 export async function runStatusCommand(appName: string): Promise<number> {
@@ -10,31 +13,47 @@ export async function runStatusCommand(appName: string): Promise<number> {
   }
 
   const supervisorAlive = await isProcessAlive(state.supervisorPid);
-  const childAlive = state.childPid
-    ? await isProcessAlive(state.childPid)
+  const wrapperAlive = state.childPid ? await isProcessAlive(state.childPid) : false;
+  const listenerAlive = state.listenerPid
+    ? await isProcessAlive(state.listenerPid)
     : false;
+  const portOwnerPid = await findListeningPortOwnerPid(state.port);
 
   if (!supervisorAlive) {
     state.lastKnownStatus = state.crashLoopDetected ? "crash-loop" : "stopped";
-    await upsertAppState(state);
   }
 
-  const health = childAlive
+  const shouldCheckHealth = Boolean(portOwnerPid || listenerAlive || wrapperAlive);
+  const health = shouldCheckHealth
     ? await checkHealth(state.port, state.healthcheckPath)
-    : { ok: false, error: "child process not running", status: undefined };
+    : { ok: false, error: "managed app process not running", status: undefined };
 
-  if (supervisorAlive && childAlive) {
-    state.lastKnownStatus = health.ok ? "running" : "unhealthy";
-    await upsertAppState(state);
+  if (supervisorAlive && health.ok) {
+    state.lastKnownStatus = "running";
+  } else if (supervisorAlive && portOwnerPid && !health.ok) {
+    state.lastKnownStatus = "unhealthy";
+  } else if (supervisorAlive && !wrapperAlive && portOwnerPid && !listenerAlive) {
+    state.lastKnownStatus = "blocked";
+    state.blockedReason = `port ${state.port} occupied by pid ${portOwnerPid}`;
+  } else {
+    state.lastKnownStatus = "stopped";
+    state.blockedReason = undefined;
   }
+
+  state.portOwnerPid = portOwnerPid;
+  await upsertAppState(state);
 
   console.log(`App ${appName} is ${state.lastKnownStatus}.`);
   console.log(
     `- supervisor: ${supervisorAlive ? `alive (pid ${state.supervisorPid})` : `stopped (pid ${state.supervisorPid})`}`,
   );
   console.log(
-    `- child: ${childAlive ? `alive (pid ${state.childPid})` : "stopped"}`,
+    `- wrapper child: ${wrapperAlive ? `alive (pid ${state.childPid})` : "stopped"}`,
   );
+  console.log(
+    `- listener: ${listenerAlive ? `alive (pid ${state.listenerPid})` : "unknown/stopped"}`,
+  );
+  console.log(`- portOwner: ${portOwnerPid ? `pid ${portOwnerPid}` : "none"}`);
   console.log(`- startedAt: ${state.startedAt}`);
   console.log(`- port: ${state.port}`);
   console.log(`- log: ${state.logPath}`);
@@ -45,6 +64,9 @@ export async function runStatusCommand(appName: string): Promise<number> {
   console.log(`- restartPolicy: ${state.restartPolicy}`);
   console.log(`- restartCount: ${state.restartCount}`);
   console.log(`- crashLoopDetected: ${state.crashLoopDetected}`);
+  if (state.blockedReason) {
+    console.log(`- blockedReason: ${state.blockedReason}`);
+  }
   if (state.lastExitCode !== undefined) {
     console.log(`- lastExitCode: ${state.lastExitCode}`);
   }
@@ -58,5 +80,5 @@ export async function runStatusCommand(appName: string): Promise<number> {
     `- health: ${health.ok ? `ok (${health.status ?? 200})` : (health.error ?? "failed")}`,
   );
 
-  return supervisorAlive && childAlive && health.ok ? 0 : 1;
+  return supervisorAlive && health.ok ? 0 : 1;
 }

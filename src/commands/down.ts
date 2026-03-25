@@ -8,6 +8,10 @@ export async function runDownCommand(appName: string): Promise<number> {
     return 1;
   }
 
+  if (state.listenerPid && (await isProcessAlive(state.listenerPid))) {
+    await stopProcess(state.listenerPid);
+  }
+
   if (state.childPid && (await isProcessAlive(state.childPid))) {
     await stopProcess(state.childPid);
   }
@@ -16,6 +20,9 @@ export async function runDownCommand(appName: string): Promise<number> {
   await upsertAppState({
     ...state,
     childPid: undefined,
+    listenerPid: undefined,
+    portOwnerPid: undefined,
+    blockedReason: undefined,
     lastKnownStatus: "stopped",
     lastExitAt: new Date().toISOString(),
   });

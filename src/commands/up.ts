@@ -114,6 +114,8 @@ export async function runUpCommand(
       workingDirectory: prepared.workingDirectory,
       supervisorPid: process.pid,
       childPid: undefined,
+      listenerPid: undefined,
+      portOwnerPid: undefined,
       port: prepared.manifest.port,
       healthcheckPath: prepared.manifest.healthcheckPath,
       logPath,
@@ -125,6 +127,7 @@ export async function runUpCommand(
       lastExitAt: undefined,
       restorable: prepared.manifest.runtime.restorable,
       crashLoopDetected: false,
+      blockedReason: undefined,
     });
 
     console.log(`Starting supervisor for ${prepared.manifest.name}...`);

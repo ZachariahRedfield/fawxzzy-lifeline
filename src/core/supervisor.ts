@@ -4,11 +4,18 @@ import { createWriteStream } from "node:fs";
 
 import { loadEnvFile } from "./load-env-file.js";
 import { appendLogHeader } from "./log-store.js";
+import {
+  findListeningPortOwnerPid,
+  isProcessAlive,
+  stopProcess,
+  waitForPortToClear,
+} from "./process-manager.js";
 import { resolveManifestConfig } from "./resolve-config.js";
 import { getAppState, upsertAppState } from "./state-store.js";
 
 const RESTART_WINDOW_MS = 60_000;
 const RESTART_THRESHOLD = 5;
+const PORT_CLEAR_TIMEOUT_MS = 8_000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -16,6 +23,61 @@ function delay(ms: number): Promise<void> {
 
 function computeBackoffMs(restartCount: number): number {
   return Math.min(30_000, 1_000 * 2 ** Math.max(0, restartCount - 1));
+}
+
+async function waitForListenerPid(port: number): Promise<number | undefined> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const ownerPid = await findListeningPortOwnerPid(port);
+    if (ownerPid) {
+      return ownerPid;
+    }
+    await delay(200);
+  }
+
+  return undefined;
+}
+
+async function ensurePortReadyForRestart(
+  appName: string,
+): Promise<{ ok: true } | { ok: false; blockedReason: string }> {
+  const latest = await getAppState(appName);
+  if (!latest) {
+    return { ok: false, blockedReason: `missing app state for ${appName}` };
+  }
+
+  const ownerPid = await findListeningPortOwnerPid(latest.port);
+  if (!ownerPid) {
+    return { ok: true };
+  }
+
+  await appendLogHeader(
+    latest.logPath,
+    `[supervisor] ${new Date().toISOString()} detected port ${latest.port} still occupied by pid ${ownerPid} before restart`,
+  );
+
+  if (
+    latest.listenerPid &&
+    ownerPid === latest.listenerPid &&
+    (await isProcessAlive(ownerPid))
+  ) {
+    await appendLogHeader(
+      latest.logPath,
+      `[supervisor] ${new Date().toISOString()} stopping stale listener pid ${ownerPid} before restart`,
+    );
+    await stopProcess(ownerPid);
+  }
+
+  const cleared = await waitForPortToClear(latest.port, PORT_CLEAR_TIMEOUT_MS);
+  if (cleared) {
+    return { ok: true };
+  }
+
+  const blockedOwner = await findListeningPortOwnerPid(latest.port);
+  const blockedReason = blockedOwner
+    ? `Port ${latest.port} is still occupied by pid ${blockedOwner}`
+    : `Port ${latest.port} did not clear in ${PORT_CLEAR_TIMEOUT_MS}ms`;
+  return { ok: false, blockedReason };
 }
 
 export async function runSupervisor(appName: string): Promise<number> {
@@ -58,8 +120,11 @@ export async function runSupervisor(appName: string): Promise<number> {
     ...current,
     supervisorPid: process.pid,
     childPid: undefined,
+    listenerPid: undefined,
+    portOwnerPid: undefined,
     startedAt: new Date().toISOString(),
     lastKnownStatus: "stopped",
+    blockedReason: undefined,
   });
   await appendLogHeader(
     current.logPath,
@@ -70,6 +135,22 @@ export async function runSupervisor(appName: string): Promise<number> {
     const state = await getAppState(appName);
     if (!state) {
       return 0;
+    }
+
+    const restartPortReady = await ensurePortReadyForRestart(appName);
+    if (!restartPortReady.ok) {
+      await upsertAppState({
+        ...state,
+        childPid: undefined,
+        portOwnerPid: await findListeningPortOwnerPid(state.port),
+        lastKnownStatus: "blocked",
+        blockedReason: restartPortReady.blockedReason,
+      });
+      await appendLogHeader(
+        state.logPath,
+        `[supervisor] ${new Date().toISOString()} restart blocked: ${restartPortReady.blockedReason}`,
+      );
+      return 1;
     }
 
     const logStream = createWriteStream(state.logPath, { flags: "a" });
@@ -88,23 +169,35 @@ export async function runSupervisor(appName: string): Promise<number> {
       return 1;
     }
 
+    let logClosed = false;
+    const writeChunk = (prefix: "stdout" | "stderr", chunk: unknown) => {
+      if (logClosed) {
+        return;
+      }
+      logStream.write(`[app:${prefix}] ${String(chunk)}`);
+    };
+
     child.stdout.on("data", (chunk) => {
-      logStream.write(`[app:stdout] ${String(chunk)}`);
+      writeChunk("stdout", chunk);
     });
     child.stderr.on("data", (chunk) => {
-      logStream.write(`[app:stderr] ${String(chunk)}`);
+      writeChunk("stderr", chunk);
     });
 
+    const listenerPid = await waitForListenerPid(state.port);
     await upsertAppState({
       ...state,
       supervisorPid: process.pid,
       childPid: child.pid,
+      listenerPid,
+      portOwnerPid: listenerPid,
       lastKnownStatus: "running",
       crashLoopDetected: false,
+      blockedReason: undefined,
     });
     await appendLogHeader(
       state.logPath,
-      `[supervisor] ${new Date().toISOString()} child started (pid ${child.pid})`,
+      `[supervisor] ${new Date().toISOString()} child started (wrapper pid ${child.pid}${listenerPid ? `, listener pid ${listenerPid}` : ""})`,
     );
 
     const exit = await new Promise<{
@@ -116,6 +209,7 @@ export async function runSupervisor(appName: string): Promise<number> {
       );
     });
 
+    logClosed = true;
     logStream.end();
 
     const exitedAt = new Date().toISOString();
@@ -127,6 +221,7 @@ export async function runSupervisor(appName: string): Promise<number> {
     const nextState = {
       ...latest,
       childPid: undefined,
+      portOwnerPid: await findListeningPortOwnerPid(latest.port),
       lastExitCode: exit.code ?? undefined,
       lastExitAt: exitedAt,
       lastKnownStatus: "stopped" as const,
