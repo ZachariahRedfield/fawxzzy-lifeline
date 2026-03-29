@@ -195,9 +195,37 @@ try {
     );
   }
 
+  await run(["restart", appName]);
+  const postRestartState = await waitForRunning();
+  if (postRestartState.childPid === startedState.childPid) {
+    throw new Error(
+      `Expected managed child pid to change after CLI restart, got same pid ${postRestartState.childPid}`,
+    );
+  }
+
+  const statusAfterRestart = await run(["status", appName], {
+    allowFailure: true,
+  });
+  if (
+    !statusAfterRestart.stdout.includes("supervisor: alive") ||
+    !statusAfterRestart.stdout.includes("- child: alive") ||
+    !statusAfterRestart.stdout.includes("- health: ok")
+  ) {
+    throw new Error(
+      `Expected healthy alive status after CLI restart, got:\n${statusAfterRestart.stdout}\n${statusAfterRestart.stderr}`,
+    );
+  }
+
+  const logsAfterRestart = await run(["logs", appName, "80"]);
+  if (!logsAfterRestart.stdout.includes(`runtime-smoke-app listening on ${runtimePort}`)) {
+    throw new Error(
+      `Expected runtime log line after CLI restart, got:\n${logsAfterRestart.stdout}\n${logsAfterRestart.stderr}`,
+    );
+  }
+
   await request("/crash");
   const postCrashState = await waitForRestartCountAtLeast(1);
-  if (postCrashState.childPid === startedState.childPid) {
+  if (postCrashState.childPid === postRestartState.childPid) {
     throw new Error(
       `Expected managed child pid to change after restart, got same pid ${postCrashState.childPid}`,
     );
