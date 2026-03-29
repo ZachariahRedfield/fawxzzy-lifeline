@@ -1,7 +1,17 @@
 import { validateAppManifest } from "../contracts/app-manifest.js";
+import {
+  validateFitnessMirrorManifestFile,
+} from "../contracts/fitness-mirror.js";
 import { ManifestLoadError, ValidationError } from "../core/errors.js";
 import { loadManifestFile } from "../core/load-manifest.js";
 import { resolveManifestConfig } from "../core/resolve-config.js";
+
+const FITNESS_MIRROR_MANIFEST_PATH = "examples/fitness-app.lifeline.yml";
+
+function isFitnessMirrorManifestPath(manifestPath: string): boolean {
+  const normalized = manifestPath.replace(/\\/g, "/").replace(/^\.\//, "");
+  return normalized === FITNESS_MIRROR_MANIFEST_PATH;
+}
 
 export async function runValidateCommand(
   manifestPath: string,
@@ -19,6 +29,21 @@ export async function runValidateCommand(
       if (resolved.playbookPath) {
         console.log(`- playbook: ${resolved.playbookPath}`);
       }
+      return 0;
+    }
+
+    if (isFitnessMirrorManifestPath(manifestPath)) {
+      const issues = await validateFitnessMirrorManifestFile(manifestPath);
+      if (issues.length > 0) {
+        console.error(`Fitness mirror manifest is invalid: ${manifestPath}`);
+        for (const issue of issues) {
+          console.error(`- ${issue.path}: ${issue.message}`);
+        }
+        return 1;
+      }
+
+      console.log(`Fitness mirror manifest is valid: ${manifestPath}`);
+      console.log("- boundary: fitness manifest mirror");
       return 0;
     }
 

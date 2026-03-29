@@ -11,7 +11,9 @@
   "bin": {
     "lifeline": "dist/cli.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -21,7 +23,9 @@
     "validate:playbook": "node dist/cli.js validate examples/playbook-ui.lifeline.yml",
     "lifeline": "node dist/cli.js",
     "smoke:runtime": "node scripts/smoke-runtime.mjs",
-    "smoke:playbook": "node scripts/smoke-playbook-resolution.mjs"
+    "smoke:playbook": "node scripts/smoke-playbook-resolution.mjs",
+    "validate:fitness:mirror": "node scripts/validate-fitness-mirror.mjs",
+    "test:validate-boundaries": "node scripts/test-validate-boundaries.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
