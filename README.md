@@ -164,6 +164,8 @@ Playbook smoke invokes the canonical local Lifeline CLI entrypoint (`node dist/c
 
 The fitness app and Playbook UI remain early Lifeline targets. Their manifests continue to document the shared contract shape, but actual runtime execution requires a valid local `deploy.workingDirectory` on the machine where Lifeline runs. Their application code does not live in this repository.
 
+`examples/fitness-app.lifeline.yml` is a Lifeline-local mirror of the Fitness-owned manifest contract boundary. Keep its shape aligned to the external `.lifeline/fitness.lifeline.yml` fields Lifeline consumes, and do not independently evolve this mirror as a separate contract.
+
 ## Minimal dependency policy
 
 Lifeline keeps dependencies intentionally small:
