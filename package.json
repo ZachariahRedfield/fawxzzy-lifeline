@@ -26,7 +26,8 @@
     "smoke:playbook": "node scripts/smoke-playbook-resolution.mjs",
     "validate:fitness:mirror": "node scripts/validate-fitness-mirror.mjs",
     "test:validate-boundaries": "node scripts/test-validate-boundaries.mjs",
-    "smoke:runtime:missing-env": "node scripts/smoke-runtime-missing-env.mjs"
+    "smoke:runtime:missing-env": "node scripts/smoke-runtime-missing-env.mjs",
+    "smoke:runtime:restart-never": "node scripts/smoke-runtime-restart-never.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
