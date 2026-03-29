@@ -25,6 +25,13 @@ export async function runRestoreCommand(): Promise<number> {
       continue;
     }
 
+    if (app.lastKnownStatus !== "running" && app.lastKnownStatus !== "unhealthy") {
+      console.log(
+        `Skipping ${app.name}: last known status is ${app.lastKnownStatus}; not restorable as running.`,
+      );
+      continue;
+    }
+
     const cliPath = process.argv[1] ?? "dist/cli.js";
     const supervisorPid = await startDetachedCommand({
       command: `${JSON.stringify(process.execPath)} ${JSON.stringify(cliPath)} supervise ${JSON.stringify(app.name)}`,

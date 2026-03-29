@@ -131,6 +131,26 @@ async function waitForRunning() {
   );
 }
 
+async function assertStoppedWithReleasedPort(contextLabel) {
+  const status = await run(["status", appName], { allowFailure: true });
+  if (!status.stdout.includes(`App ${appName} is stopped.`)) {
+    throw new Error(
+      `Expected stopped status ${contextLabel}, got:\n${status.stdout}\n${status.stderr}`,
+    );
+  }
+
+  if (!status.stdout.includes("- portOwner: none")) {
+    throw new Error(
+      `Expected managed port owner to be released ${contextLabel}, got:\n${status.stdout}\n${status.stderr}`,
+    );
+  }
+
+  const portReleased = await canBindPort(runtimePort);
+  if (!portReleased) {
+    throw new Error(`Expected port ${runtimePort} to be released ${contextLabel}`);
+  }
+}
+
 async function prepareFixtureConfig() {
   tempRootDir = await mkdtemp(path.join(tmpdir(), "lifeline-runtime-never-smoke-"));
   const tempFixtureDir = path.join(tempRootDir, "runtime-smoke-app");
@@ -200,23 +220,35 @@ try {
     );
   }
 
-  const statusAfterCrash = await run(["status", appName], { allowFailure: true });
-  if (!statusAfterCrash.stdout.includes(`App ${appName} is stopped.`)) {
+  await assertStoppedWithReleasedPort("after crash with restartPolicy never");
+
+  const persistedStoppedStateBeforeRestore = await readRuntimeState();
+  if (!persistedStoppedStateBeforeRestore) {
+    throw new Error("Expected persisted runtime state to exist before restore");
+  }
+
+  await run(["restore"]);
+
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+
+  const postRestoreState = await readRuntimeState();
+  if (!postRestoreState) {
+    throw new Error("Expected persisted runtime state for app after restore");
+  }
+
+  if (postRestoreState.lastKnownStatus === "running") {
     throw new Error(
-      `Expected stopped status after crash with restartPolicy never, got:\n${statusAfterCrash.stdout}\n${statusAfterCrash.stderr}`,
+      `Expected restore to keep app stopped, got ${postRestoreState.lastKnownStatus}`,
     );
   }
 
-  if (!statusAfterCrash.stdout.includes("- portOwner: none")) {
+  if (postRestoreState.childPid && isPidAlive(postRestoreState.childPid)) {
     throw new Error(
-      `Expected managed port owner to be released after crash, got:\n${statusAfterCrash.stdout}\n${statusAfterCrash.stderr}`,
+      `Expected restore not to resurrect app, found live pid ${postRestoreState.childPid}`,
     );
   }
 
-  const portReleased = await canBindPort(runtimePort);
-  if (!portReleased) {
-    throw new Error(`Expected port ${runtimePort} to be released after crash`);
-  }
+  await assertStoppedWithReleasedPort("after restore of a crash-stopped restartPolicy never app");
 } catch (error) {
   await cleanup();
   throw error;
