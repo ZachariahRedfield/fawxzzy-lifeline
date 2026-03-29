@@ -1,18 +1,21 @@
 import { spawn } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
+import path from "node:path";
 import process from "node:process";
+import { tmpdir } from "node:os";
 
 const cli = ["node", "dist/cli.js"];
 const fixtureManifestPath =
   "fixtures/runtime-smoke-app/runtime-smoke-app.lifeline.yml";
-const fixtureEnvPath = "fixtures/runtime-smoke-app/.env.runtime";
 const statePath = ".lifeline/state.json";
 const appName = "runtime-smoke-app";
 
 const runtimePort = 4500 + Math.floor(Math.random() * 2000);
-const manifestPath = fixtureManifestPath;
+let manifestPath = fixtureManifestPath;
+let tempFixtureDir;
+let tempRootDir;
 
 function run(args, { allowFailure = false } = {}) {
   return new Promise((resolve, reject) => {
@@ -103,13 +106,9 @@ async function hardCleanup() {
   }
 
   await new Promise((resolve) => {
-    const child = spawn(
-      "pkill",
-      ["-f", "fixtures/runtime-smoke-app/server.js"],
-      {
-        stdio: "ignore",
-      },
-    );
+    const child = spawn("pkill", ["-f", "runtime-smoke-app/server.js"], {
+      stdio: "ignore",
+    });
     child.on("error", () => resolve());
     child.on("exit", () => resolve());
   });
@@ -153,19 +152,27 @@ async function waitForRestartCountAtLeast(target) {
 }
 
 async function prepareFixtureConfig() {
-  const envRaw = await readFile(fixtureEnvPath, "utf8");
-  await writeFile(
-    fixtureEnvPath,
-    envRaw.replace(/^PORT=.*$/m, `PORT=${runtimePort}`),
-    "utf8",
-  );
+  tempRootDir = await mkdtemp(path.join(tmpdir(), "lifeline-runtime-smoke-"));
+  tempFixtureDir = path.join(tempRootDir, "runtime-smoke-app");
 
-  const manifestRaw = await readFile(fixtureManifestPath, "utf8");
+  await cp("fixtures/runtime-smoke-app", tempFixtureDir, { recursive: true });
+
+  const envPath = path.join(tempFixtureDir, ".env.runtime");
+  const envRaw = await readFile(envPath, "utf8");
+  await writeFile(envPath, envRaw.replace(/^PORT=.*$/m, `PORT=${runtimePort}`), "utf8");
+
+  const tempManifestPath = path.join(
+    tempFixtureDir,
+    "runtime-smoke-app.lifeline.yml",
+  );
+  const manifestRaw = await readFile(tempManifestPath, "utf8");
   await writeFile(
-    fixtureManifestPath,
+    tempManifestPath,
     manifestRaw.replace(/^port: .*$/m, `port: ${runtimePort}`),
     "utf8",
   );
+
+  manifestPath = tempManifestPath;
 }
 
 try {
@@ -234,4 +241,8 @@ try {
 } catch (error) {
   await cleanup();
   throw error;
+} finally {
+  if (tempRootDir) {
+    await rm(tempRootDir, { recursive: true, force: true });
+  }
 }
