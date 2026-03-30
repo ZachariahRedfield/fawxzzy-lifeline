@@ -29,7 +29,8 @@
     "smoke:runtime:missing-env": "node scripts/smoke-runtime-missing-env.mjs",
     "smoke:runtime:restart-never": "node scripts/smoke-runtime-restart-never.mjs",
     "smoke:runtime:logs-no-history": "node scripts/smoke-runtime-logs-no-history.mjs",
-    "smoke:runtime:restart-no-history": "node scripts/smoke-runtime-restart-no-history.mjs"
+    "smoke:runtime:restart-no-history": "node scripts/smoke-runtime-restart-no-history.mjs",
+    "smoke:runtime:down-no-history": "node scripts/smoke-runtime-down-no-history.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
