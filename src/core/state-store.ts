@@ -40,13 +40,10 @@ async function ensureStateDirectory(): Promise<void> {
 }
 
 export async function getStatePath(): Promise<string> {
-  await ensureStateDirectory();
   return STATE_PATH;
 }
 
 export async function readState(): Promise<RuntimeStateFile> {
-  await ensureStateDirectory();
-
   const raw = await readFile(STATE_PATH, "utf8").catch(() => "");
   if (!raw) {
     return { apps: {} };

@@ -50,6 +50,11 @@ async function readRuntimeState(name) {
   return parsed?.apps?.[name];
 }
 
+async function readStateFileSnapshot() {
+  const raw = await readFile(statePath, "utf8").catch(() => "");
+  return raw;
+}
+
 async function fileExists(filePath) {
   try {
     await access(filePath);
@@ -107,6 +112,7 @@ async function assertNoPersistedState(name, when) {
 try {
   const appLogPath = logPath(appName);
 
+  const stateSnapshotBefore = await readStateFileSnapshot();
   await assertNoPersistedState(appName, "before restart command");
 
   if (await fileExists(appLogPath)) {
@@ -144,6 +150,11 @@ try {
     throw new Error(
       `Expected no app-related processes after restart command, found:\n${processesAfter.join("\n")}`,
     );
+  }
+
+  const stateSnapshotAfter = await readStateFileSnapshot();
+  if (stateSnapshotAfter !== stateSnapshotBefore) {
+    throw new Error("Expected restart command to leave .lifeline/state.json unchanged");
   }
 
   const statusResult = await run(["status", appName], { allowFailure: true });

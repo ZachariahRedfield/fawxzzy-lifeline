@@ -50,6 +50,11 @@ async function readRuntimeState(name) {
   return parsed?.apps?.[name];
 }
 
+async function readStateFileSnapshot() {
+  const raw = await readFile(statePath, "utf8").catch(() => "");
+  return raw;
+}
+
 async function fileExists(filePath) {
   try {
     await access(filePath);
@@ -59,20 +64,66 @@ async function fileExists(filePath) {
   }
 }
 
+async function listProcessesForApp(name) {
+  if (process.platform === "win32") {
+    return [];
+  }
+
+  return new Promise((resolve, reject) => {
+    const child = spawn("ps", ["-eo", "pid=,args="], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: process.env,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code !== 0) {
+        reject(new Error(`ps failed (code ${code}): ${stderr}`));
+        return;
+      }
+
+      const lines = stdout
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.includes(name));
+      resolve(lines);
+    });
+  });
+}
+
 async function assertNoPersistedState(name, when) {
   const state = await readRuntimeState(name);
   if (state) {
-    throw new Error(`Expected no runtime state ${when} for ${name}, found: ${JSON.stringify(state)}`);
+    throw new Error(
+      `Expected no runtime state ${when} for ${name}, found: ${JSON.stringify(state)}`,
+    );
   }
 }
 
 try {
   const appLogPath = logPath(appName);
 
+  const stateSnapshotBefore = await readStateFileSnapshot();
   await assertNoPersistedState(appName, "before logs command");
 
   if (await fileExists(appLogPath)) {
     throw new Error(`Expected no log file before logs command, found ${appLogPath}`);
+  }
+
+  const processesBefore = await listProcessesForApp(appName);
+  if (processesBefore.length > 0) {
+    throw new Error(
+      `Expected no app-related processes before logs command, found:\n${processesBefore.join("\n")}`,
+    );
   }
 
   const logsResult = await run(["logs", appName], { allowFailure: true });
@@ -92,6 +143,18 @@ try {
 
   if (await fileExists(appLogPath)) {
     throw new Error(`Expected logs command not to create ${appLogPath}, but file exists`);
+  }
+
+  const processesAfter = await listProcessesForApp(appName);
+  if (processesAfter.length > 0) {
+    throw new Error(
+      `Expected no app-related processes after logs command, found:\n${processesAfter.join("\n")}`,
+    );
+  }
+
+  const stateSnapshotAfter = await readStateFileSnapshot();
+  if (stateSnapshotAfter !== stateSnapshotBefore) {
+    throw new Error("Expected logs command to leave .lifeline/state.json unchanged");
   }
 
   const statusResult = await run(["status", appName], { allowFailure: true });
