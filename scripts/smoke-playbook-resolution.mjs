@@ -3,6 +3,9 @@ import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { ensureBuilt } from "./lib/ensure-built.mjs";
+
+await ensureBuilt();
 
 const cli = ["node", "dist/cli.js"];
 const fixturePlaybookPath = "fixtures/playbook-export";

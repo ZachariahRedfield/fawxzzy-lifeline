@@ -5,6 +5,9 @@ import net from "node:net";
 import path from "node:path";
 import process from "node:process";
 import { tmpdir } from "node:os";
+import { ensureBuilt } from "./lib/ensure-built.mjs";
+
+await ensureBuilt();
 
 const cli = ["node", "dist/cli.js"];
 const statePath = ".lifeline/state.json";

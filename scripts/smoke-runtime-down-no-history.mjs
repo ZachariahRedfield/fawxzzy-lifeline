@@ -2,6 +2,9 @@ import { spawn } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { ensureBuilt } from "./lib/ensure-built.mjs";
+
+await ensureBuilt();
 
 const cli = ["node", "dist/cli.js"];
 const statePath = ".lifeline/state.json";
