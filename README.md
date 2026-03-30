@@ -158,7 +158,7 @@ pnpm smoke:playbook
 
 CI uses the same canonical Playbook verification path: `pnpm smoke:playbook`.
 
-Playbook smoke invokes the canonical local Lifeline CLI entrypoint (`node dist/cli.js`) and therefore requires `pnpm build` beforehand so `dist/cli.js` exists.
+All smoke scripts invoke the canonical local Lifeline CLI entrypoint (`node dist/cli.js`) and therefore require `pnpm build` beforehand so `dist/cli.js` exists.
 
 ## Early target manifests
 
