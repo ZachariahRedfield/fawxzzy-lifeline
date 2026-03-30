@@ -21,10 +21,14 @@ export async function runStatusCommand(appName: string): Promise<number> {
     : false;
   const portOwnerPid = await findListeningPortOwnerPid(state.port);
 
-  const inferredManagedPid = state.childPid ?? state.listenerPid ?? portOwnerPid;
-  const managedChildAlive = inferredManagedPid
-    ? await isProcessAlive(inferredManagedPid)
-    : false;
+  const inferredManagedPid = state.childPid ?? state.listenerPid;
+  const managedChildAlive = inferredManagedPid ? await isProcessAlive(inferredManagedPid) : false;
+  const managedPortOwner =
+    Boolean(portOwnerPid) &&
+    Boolean(
+      (state.childPid && portOwnerPid === state.childPid) ||
+        (state.listenerPid && portOwnerPid === state.listenerPid),
+    );
 
   if (!supervisorAlive) {
     if (portOwnerPid) {
@@ -41,12 +45,13 @@ export async function runStatusCommand(appName: string): Promise<number> {
     ? await checkHealth(state.port, state.healthcheckPath)
     : { ok: false, error: "managed app process not running", status: undefined };
 
-  if (supervisorAlive && health.ok && (managedChildAlive || Boolean(portOwnerPid))) {
+  if (supervisorAlive && health.ok && managedChildAlive && managedPortOwner) {
     state.lastKnownStatus = "running";
     state.childPid = inferredManagedPid;
     state.blockedReason = undefined;
-  } else if (supervisorAlive && portOwnerPid && !health.ok) {
+  } else if (supervisorAlive && managedPortOwner && !health.ok) {
     state.lastKnownStatus = "unhealthy";
+    state.blockedReason = undefined;
   } else if (supervisorAlive && !managedChildAlive && portOwnerPid) {
     state.lastKnownStatus = "blocked";
     state.blockedReason = `port ${state.port} occupied by pid ${portOwnerPid}`;
@@ -63,7 +68,7 @@ export async function runStatusCommand(appName: string): Promise<number> {
     `- supervisor: ${supervisorAlive ? `alive (pid ${state.supervisorPid})` : `stopped (pid ${state.supervisorPid})`}`,
   );
   console.log(
-    `- child: ${managedChildAlive ? `alive (pid ${state.childPid ?? inferredManagedPid})` : "stopped"}`,
+    `- child: ${managedChildAlive ? `alive (pid ${inferredManagedPid})` : "stopped"}`,
   );
   console.log(
     `- wrapper: ${wrapperAlive ? `alive (pid ${state.wrapperPid})` : "stopped"}`,
@@ -98,5 +103,5 @@ export async function runStatusCommand(appName: string): Promise<number> {
     `- health: ${health.ok ? `ok (${health.status ?? 200})` : (health.error ?? "failed")}`,
   );
 
-  return supervisorAlive && health.ok && (managedChildAlive || Boolean(portOwnerPid)) ? 0 : 1;
+  return supervisorAlive && health.ok && managedChildAlive && managedPortOwner ? 0 : 1;
 }
