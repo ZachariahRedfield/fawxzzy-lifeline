@@ -266,6 +266,68 @@ try {
   if (!portReleased) {
     throw new Error(`Expected port ${runtimePort} to be released after down`);
   }
+
+  const stateAfterDown = await readRuntimeState();
+  if (!stateAfterDown || stateAfterDown.lastKnownStatus !== "stopped") {
+    throw new Error(
+      `Expected persisted runtime state to remain stopped after down, got:\n${JSON.stringify(stateAfterDown, null, 2)}`,
+    );
+  }
+  if (isPidAlive(stateAfterDown.childPid) || isPidAlive(stateAfterDown.supervisorPid)) {
+    throw new Error(
+      `Expected no live child/supervisor after down, got:\n${JSON.stringify(stateAfterDown, null, 2)}`,
+    );
+  }
+
+  const secondDown = await run(["down", appName], { allowFailure: true });
+  if (secondDown.code !== 0 && !secondDown.stdout.includes("already stopped")) {
+    throw new Error(
+      `Expected second down to be safe on stopped app, got:\nstdout:\n${secondDown.stdout}\nstderr:\n${secondDown.stderr}`,
+    );
+  }
+
+  const statusAfterSecondDown = await run(["status", appName], {
+    allowFailure: true,
+  });
+  if (!statusAfterSecondDown.stdout.includes("App runtime-smoke-app is stopped.")) {
+    throw new Error(
+      `Expected stopped status after second down, got:\n${statusAfterSecondDown.stdout}\n${statusAfterSecondDown.stderr}`,
+    );
+  }
+  if (!statusAfterSecondDown.stdout.includes("- portOwner: none")) {
+    throw new Error(
+      `Expected no port owner after second down, got:\n${statusAfterSecondDown.stdout}\n${statusAfterSecondDown.stderr}`,
+    );
+  }
+  if (
+    statusAfterSecondDown.stdout.includes("supervisor: alive") ||
+    statusAfterSecondDown.stdout.includes("- child: alive")
+  ) {
+    throw new Error(
+      `Expected no live supervisor/child metadata after second down, got:\n${statusAfterSecondDown.stdout}\n${statusAfterSecondDown.stderr}`,
+    );
+  }
+
+  const portStillReleased = await canBindPort(runtimePort);
+  if (!portStillReleased) {
+    throw new Error(`Expected port ${runtimePort} to remain released after second down`);
+  }
+
+  const stateAfterSecondDown = await readRuntimeState();
+  if (!stateAfterSecondDown || stateAfterSecondDown.lastKnownStatus !== "stopped") {
+    throw new Error(
+      `Expected persisted runtime state to remain stopped after second down, got:\n${JSON.stringify(stateAfterSecondDown, null, 2)}`,
+    );
+  }
+  if (
+    stateAfterSecondDown.lastKnownStatus === "running" ||
+    isPidAlive(stateAfterSecondDown.childPid) ||
+    isPidAlive(stateAfterSecondDown.supervisorPid)
+  ) {
+    throw new Error(
+      `Expected no running runtime truth after second down, got:\n${JSON.stringify(stateAfterSecondDown, null, 2)}`,
+    );
+  }
 } catch (error) {
   await cleanup();
   throw error;
