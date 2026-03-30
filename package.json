@@ -34,7 +34,8 @@
     "smoke:runtime:status-no-history": "node scripts/smoke-runtime-status-no-history.mjs",
     "smoke:runtime:restore-no-history": "node scripts/smoke-runtime-restore-no-history.mjs",
     "smoke:runtime:status-external-kill": "node scripts/smoke-runtime-status-external-kill.mjs",
-    "smoke:runtime:status-supervisor-kill": "node scripts/smoke-runtime-status-supervisor-kill.mjs"
+    "smoke:runtime:status-supervisor-kill": "node scripts/smoke-runtime-status-supervisor-kill.mjs",
+    "smoke:runtime:status-unhealthy": "node scripts/smoke-runtime-status-unhealthy.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
