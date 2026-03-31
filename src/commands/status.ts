@@ -48,9 +48,11 @@ export async function runStatusCommand(appName: string): Promise<number> {
   if (supervisorAlive && health.ok && managedChildAlive && managedPortOwner) {
     state.lastKnownStatus = "running";
     state.childPid = inferredManagedPid;
+    state.listenerPid = portOwnerPid ?? state.listenerPid;
     state.blockedReason = undefined;
   } else if (supervisorAlive && managedPortOwner && !health.ok) {
     state.lastKnownStatus = "unhealthy";
+    state.listenerPid = portOwnerPid ?? state.listenerPid;
     state.blockedReason = undefined;
   } else if (supervisorAlive && !managedChildAlive && portOwnerPid) {
     state.lastKnownStatus = "blocked";
