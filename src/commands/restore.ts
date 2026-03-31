@@ -2,6 +2,7 @@ import {
   isProcessAlive,
   startDetachedCommand,
 } from "../core/process-manager.js";
+import { resolveManifestConfig } from "../core/resolve-config.js";
 import { readState } from "../core/state-store.js";
 
 export async function runRestoreCommand(): Promise<number> {
@@ -13,6 +14,7 @@ export async function runRestoreCommand(): Promise<number> {
   }
 
   let restored = 0;
+  let failures = 0;
   for (const app of apps) {
     if (!app.restorable) {
       continue;
@@ -32,6 +34,18 @@ export async function runRestoreCommand(): Promise<number> {
       continue;
     }
 
+    try {
+      await resolveManifestConfig({
+        manifestPath: app.manifestPath,
+        ...(app.playbookPath ? { playbookPath: app.playbookPath } : {}),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Failed to restore ${app.name}: ${message}`);
+      failures += 1;
+      continue;
+    }
+
     const cliPath = process.argv[1] ?? "dist/cli.js";
     const supervisorPid = await startDetachedCommand({
       command: `${JSON.stringify(process.execPath)} ${JSON.stringify(cliPath)} supervise ${JSON.stringify(app.name)}`,
@@ -47,5 +61,5 @@ export async function runRestoreCommand(): Promise<number> {
     console.log("No restorable apps required restart.");
   }
 
-  return 0;
+  return failures > 0 ? 1 : 0;
 }
