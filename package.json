@@ -40,6 +40,7 @@
     "smoke:runtime:status-blocked": "node scripts/smoke-runtime-status-blocked.mjs",
     "smoke:runtime:down-blocked-foreign-owner": "node scripts/smoke-runtime-down-blocked-foreign-owner.mjs",
     "smoke:runtime:restart-blocked-foreign-owner": "node scripts/smoke-runtime-restart-blocked-foreign-owner.mjs",
+    "smoke:runtime:up-foreign-owner-port": "node scripts/smoke-runtime-up-foreign-owner-port.mjs",
     "smoke:runtime:crash-loop": "node scripts/smoke-runtime-crash-loop.mjs"
   },
   "devDependencies": {

@@ -6,6 +6,7 @@ import { checkHealth, waitForHealth } from "../core/healthcheck.js";
 import { loadEnvFile } from "../core/load-env-file.js";
 import { appendLogHeader, getLogPath } from "../core/log-store.js";
 import {
+  findListeningPortOwnerPid,
   isProcessAlive,
   runForegroundCommand,
   startDetachedCommand,
@@ -76,6 +77,15 @@ export async function runUpCommand(
     if (existing && (await isProcessAlive(existing.supervisorPid))) {
       console.error(
         `App ${prepared.manifest.name} is already managed by supervisor pid ${existing.supervisorPid}.`,
+      );
+      return 1;
+    }
+    const existingPortOwner = await findListeningPortOwnerPid(
+      prepared.manifest.port,
+    );
+    if (existingPortOwner) {
+      console.error(
+        `App ${prepared.manifest.name} cannot start: port ${prepared.manifest.port} is already occupied by pid ${existingPortOwner}.`,
       );
       return 1;
     }
