@@ -45,7 +45,8 @@
     "smoke:runtime:restore-blocked-foreign-owner": "node scripts/smoke-runtime-restore-blocked-foreign-owner.mjs",
     "smoke:runtime:restore-foreign-owner-prebind": "node scripts/smoke-runtime-restore-foreign-owner-prebind.mjs",
     "smoke:runtime:status-stale-listener-pid": "node scripts/smoke-runtime-status-stale-listener-pid.mjs",
-    "smoke:runtime:restore-relaunch": "node scripts/smoke-runtime-restore-relaunch.mjs"
+    "smoke:runtime:restore-relaunch": "node scripts/smoke-runtime-restore-relaunch.mjs",
+    "smoke:runtime:restart-playbook-persisted-path": "node scripts/smoke-runtime-restart-playbook-persisted-path.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
