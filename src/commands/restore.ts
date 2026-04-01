@@ -3,6 +3,7 @@ import {
   startDetachedCommand,
 } from "../core/process-manager.js";
 import { resolveManifestConfig } from "../core/resolve-config.js";
+import { resolveWorkingDirectory } from "../core/resolve-working-directory.js";
 import { readState } from "../core/state-store.js";
 
 export async function runRestoreCommand(): Promise<number> {
@@ -35,10 +36,12 @@ export async function runRestoreCommand(): Promise<number> {
     }
 
     try {
-      await resolveManifestConfig({
+      const resolved = await resolveManifestConfig({
         manifestPath: app.manifestPath,
         ...(app.playbookPath ? { playbookPath: app.playbookPath } : {}),
       });
+
+      await resolveWorkingDirectory(app.manifestPath, resolved.resolvedManifest);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Failed to restore ${app.name}: ${message}`);
