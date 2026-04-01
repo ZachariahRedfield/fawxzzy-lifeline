@@ -53,6 +53,7 @@ declare module "node:path" {
   const path: {
     resolve: (...paths: string[]) => string;
     dirname: (path: string) => string;
+    basename: (path: string) => string;
     join: (...paths: string[]) => string;
   };
   export default path;
