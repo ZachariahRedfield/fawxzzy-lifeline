@@ -4,6 +4,11 @@ import { runLogsCommand } from "./commands/logs.js";
 import { runResolveCommand } from "./commands/resolve.js";
 import { runRestartCommand } from "./commands/restart.js";
 import { runRestoreCommand } from "./commands/restore.js";
+import {
+  runStartupDisableCommand,
+  runStartupEnableCommand,
+  runStartupStatusCommand,
+} from "./commands/startup.js";
 import { runStatusCommand } from "./commands/status.js";
 import { runUpCommand } from "./commands/up.js";
 import { runValidateCommand } from "./commands/validate.js";
@@ -12,8 +17,26 @@ import { runSupervisor } from "./core/supervisor.js";
 
 function printUsage(): void {
   console.log(
-    "Lifeline v1\n\nUsage:\n  lifeline validate <manifest-path> [--playbook-path <path>]\n  lifeline resolve <manifest-path> [--playbook-path <path>]\n  lifeline up <manifest-path> [--playbook-path <path>]\n  lifeline down <app-name>\n  lifeline status <app-name>\n  lifeline logs <app-name> [line-count]\n  lifeline restart <app-name> [--playbook-path <path>]\n  lifeline restore",
+    "Lifeline v1\n\nUsage:\n  lifeline validate <manifest-path> [--playbook-path <path>]\n  lifeline resolve <manifest-path> [--playbook-path <path>]\n  lifeline up <manifest-path> [--playbook-path <path>]\n  lifeline down <app-name>\n  lifeline status <app-name>\n  lifeline logs <app-name> [line-count]\n  lifeline restart <app-name> [--playbook-path <path>]\n  lifeline restore\n  lifeline startup <enable|disable|status> [--dry-run]",
   );
+}
+
+function parseStartupOptions(args: string[]): {
+  action?: string | undefined;
+  dryRun: boolean;
+} {
+  const positional: string[] = [];
+  let dryRun = false;
+
+  for (const arg of args) {
+    if (arg === "--dry-run") {
+      dryRun = true;
+      continue;
+    }
+    positional.push(arg);
+  }
+
+  return { action: positional[0], dryRun };
 }
 
 function parsePlaybookOption(args: string[]): {
@@ -119,6 +142,30 @@ async function main(argv: string[]): Promise<number> {
       return runRestartCommand(target, playbookPath);
     case "restore":
       return runRestoreCommand();
+    case "startup": {
+      const startup = parseStartupOptions(rest);
+      if (!startup.action) {
+        console.error(
+          "Missing startup action. Use enable, disable, or status.",
+        );
+        printUsage();
+        return 1;
+      }
+
+      if (startup.action === "enable") {
+        return runStartupEnableCommand({ dryRun: startup.dryRun });
+      }
+      if (startup.action === "disable") {
+        return runStartupDisableCommand({ dryRun: startup.dryRun });
+      }
+      if (startup.action === "status") {
+        return runStartupStatusCommand();
+      }
+
+      console.error(`Unknown startup action: ${startup.action}`);
+      printUsage();
+      return 1;
+    }
     case "supervise":
       if (!target) {
         console.error("Missing app name.");

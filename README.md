@@ -40,6 +40,8 @@ pnpm lifeline status runtime-smoke-app
 pnpm lifeline logs runtime-smoke-app
 pnpm lifeline restart runtime-smoke-app
 pnpm lifeline restore
+pnpm lifeline startup status
+pnpm lifeline startup enable --dry-run
 pnpm lifeline down runtime-smoke-app
 ```
 
@@ -95,6 +97,20 @@ Playbook archetype exports are sparse optional default bundles. They may omit an
 - `lifeline resolve <manifest>` prints the fully resolved config that Lifeline would execute.
 - `lifeline up` and `lifeline restart` use the same resolution path as `resolve`.
 - If an app was started with Playbook defaults, Lifeline stores the resolved Playbook path in `.lifeline/state.json` so `restart` remains deterministic without retyping flags.
+
+
+## Wave 2 startup contract
+
+Lifeline now exposes a platform-neutral startup contract:
+
+- `lifeline startup enable [--dry-run]`
+- `lifeline startup disable [--dry-run]`
+- `lifeline startup status`
+
+This slice only stores desired startup-registration intent for machine-local auto-start of `lifeline restore`.
+Platform-specific installers (Task Scheduler, systemd, launchd, etc.) are intentionally not wired yet and must plug in behind this contract.
+
+Startup state is stored in `.lifeline/startup.json`.
 
 ## Runtime behavior
 
@@ -187,6 +203,7 @@ YAML parsing and env-file parsing are implemented inside the repo because the co
 - [Scope](docs/scope.md)
 - [Architecture](docs/architecture.md)
 - [App manifest contract](docs/contracts/app-manifest.md)
+- [Startup registration contract (Wave 2)](docs/contracts/startup-registration.md)
 - [ADR 0001: Lifeline v1 scope](docs/adr/0001-lifeline-v1-scope.md)
 
 
