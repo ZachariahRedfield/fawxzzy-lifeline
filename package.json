@@ -60,7 +60,8 @@
     "test:startup-deterministic": "node scripts/test-wave2-startup-deterministic.mjs",
     "test:startup-roundtrip": "node scripts/test-startup-roundtrip-windows-deterministic.mjs",
     "verify:startup-roundtrip": "pnpm lifeline startup enable && pnpm lifeline startup status && pnpm lifeline startup disable",
-    "smoke:runtime:restart-missing-required-env": "node scripts/smoke-runtime-restart-missing-required-env.mjs"
+    "smoke:runtime:restart-missing-required-env": "node scripts/smoke-runtime-restart-missing-required-env.mjs",
+    "smoke:runtime:restore-missing-required-env": "node scripts/smoke-runtime-restore-missing-required-env.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
