@@ -122,9 +122,9 @@ Playbook archetype exports are sparse optional default bundles. They may omit an
 - supports `lifeline restore` to restart restorable apps from persisted state
 
 
-## Windows startup registration (Wave 2)
+## Startup registration contract (Wave 2)
 
-Lifeline Wave 2 adds startup registration through a platform-neutral startup contract. On Windows, the first backend uses Task Scheduler and always points startup to Lifeline's canonical restore flow.
+Lifeline Wave 2 introduces a platform-neutral startup registration contract for machine-local auto-start of the `lifeline restore` flow.
 
 Commands:
 
@@ -132,17 +132,17 @@ Commands:
 pnpm lifeline startup status
 pnpm lifeline startup enable
 pnpm lifeline startup disable
+pnpm lifeline startup enable --dry-run
+pnpm lifeline startup disable --dry-run
 ```
 
-Expected behavior on Windows:
+Current Wave 2 slice behavior:
 
-- `startup enable` creates/overwrites the deterministic machine-local task `\Lifeline\Restore`.
-- The registered task command is `node dist/cli.js restore` (or the packaged executable equivalent with `restore`).
-- `startup status` reports support, enablement state, backend mechanism, and whether the task points to the restore entrypoint.
-- `startup disable` removes `\Lifeline\Restore` and is safe to run when the task is already absent.
-- `startup enable` fails clearly when the required runtime executable or built CLI path is missing.
-
-Non-Windows platforms currently report startup as unsupported in Wave 2.
+- `startup enable` records startup intent in `.lifeline/startup.json`.
+- `startup disable` clears startup intent in `.lifeline/startup.json`.
+- `startup status` reports scope, restore entrypoint, mechanism (`contract-only`), and backend readiness.
+- `--dry-run` prints the planned startup action without changing state.
+- OS-specific installer backends (Task Scheduler/systemd/launchd) are intentionally deferred and must plug in behind this contract.
 
 ## Slim manifest example with Playbook defaults
 
@@ -213,6 +213,7 @@ YAML parsing and env-file parsing are implemented inside the repo because the co
 
 - [Scope](docs/scope.md)
 - [Architecture](docs/architecture.md)
+- [Startup contract (Wave 2)](docs/startup-contract.md)
 - [App manifest contract](docs/contracts/app-manifest.md)
 - [ADR 0001: Lifeline v1 scope](docs/adr/0001-lifeline-v1-scope.md)
 
@@ -224,18 +225,18 @@ Wave 2 adds OS startup registration as a machine-integration layer on top of the
 
 1. **Enable startup registration** so the OS invokes Lifeline restore on login/boot.
    ```bash
-   pnpm lifeline startup enable <app-name>
+   pnpm lifeline startup enable
    ```
 2. **Inspect startup status** to confirm registration target, identity, and restore entrypoint.
    ```bash
-   pnpm lifeline startup status <app-name>
+   pnpm lifeline startup status
    ```
 3. **Disable startup registration** to cleanly remove machine-level wiring when you no longer want automatic restore.
    ```bash
-   pnpm lifeline startup disable <app-name>
+   pnpm lifeline startup disable
    ```
 
-Expected interaction with `restore` stays explicit: startup registration should call the same restore entrypoint (`node dist/cli.js restore`) that operators run manually. Reboot simulation is optional; deterministic verification should focus on planned command generation, registration-state inspection, and restore-entrypoint wiring.
+Expected interaction with `restore` stays explicit: startup registration contract intent always targets the same restore entrypoint (`lifeline restore`) that operators run manually. Reboot simulation is optional; deterministic verification should focus on command planning, contract-state inspection, and restore-entrypoint wiring.
 
 **Rule:** Machine-integration features need deterministic verification even when literal reboot simulation is impractical.
 
@@ -245,4 +246,4 @@ Expected interaction with `restore` stays explicit: startup registration should 
 
 ## Wave 1 notes
 
-Wave 1 added a supervisor-backed lifecycle plus restore semantics. Wave 2 adds Windows startup registration via Task Scheduler, wired to `lifeline restore`.
+Wave 1 added a supervisor-backed lifecycle plus restore semantics. Wave 2 currently adds a startup contract and CLI surface, with platform-specific installers deferred behind that seam.

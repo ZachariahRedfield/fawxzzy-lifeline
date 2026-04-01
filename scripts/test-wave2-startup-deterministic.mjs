@@ -6,35 +6,21 @@ function assert(condition, message) {
   }
 }
 
-function buildRestoreEntrypointCommand({ nodeBinary = 'node', cliPath = 'dist/cli.js' } = {}) {
-  return `${nodeBinary} ${cliPath} restore`;
-}
-
-function buildStartupRegistrationPlan({
-  appName,
-  workingDirectory,
-  nodeBinary = 'node',
-  cliPath = 'dist/cli.js',
-}) {
-  const restoreCommand = buildRestoreEntrypointCommand({ nodeBinary, cliPath });
+function buildStartupContractPlan({ action }) {
   return {
-    appName,
-    restoreCommand,
-    windowsTaskName: `Lifeline Restore (${appName})`,
-    windowsCommand: `schtasks /Create /TN "Lifeline Restore (${appName})" /TR "${restoreCommand}" /SC ONLOGON`,
-    launchdLabel: `dev.lifeline.restore.${appName}`,
-    launchdProgramArguments: [nodeBinary, cliPath, 'restore'],
-    systemdExecStart: restoreCommand,
-    workingDirectory,
+    action,
+    scope: 'machine-local',
+    restoreEntrypoint: 'lifeline restore',
+    backendStatus: 'not-installed',
   };
 }
 
-function inspectStartupRegistrationState(entry) {
+function inspectStartupContractState(entry) {
   return {
-    enabled: entry.status === 'enabled',
-    status: entry.status,
-    registrationId: entry.registrationId,
+    enabled: entry.intent === 'enabled',
+    scope: entry.scope,
     restoreEntrypoint: entry.restoreEntrypoint,
+    backendStatus: entry.backendStatus,
   };
 }
 
@@ -52,51 +38,60 @@ async function verifyRestoreEntrypointWiring() {
   );
 }
 
-function verifyStartupCommandPlanning() {
-  const plan = buildStartupRegistrationPlan({
-    appName: 'runtime-smoke-app',
-    workingDirectory: '/tmp/runtime-smoke-app',
-  });
+async function verifyContractSurfaceWiring() {
+  const startupCommandSource = await readFile(new URL('../src/commands/startup.ts', import.meta.url), 'utf8');
+  const startupCoreSource = await readFile(new URL('../src/core/startup-contract.ts', import.meta.url), 'utf8');
 
   assert(
-    plan.restoreCommand === 'node dist/cli.js restore',
-    `Expected deterministic restore command, got: ${plan.restoreCommand}`,
+    startupCommandSource.includes('--dry-run'),
+    'Expected startup command to expose --dry-run planning support.',
   );
 
   assert(
-    plan.windowsCommand.includes('schtasks /Create') && plan.windowsCommand.includes('ONLOGON'),
-    `Expected deterministic Task Scheduler registration command, got: ${plan.windowsCommand}`,
+    startupCoreSource.includes('mechanism: "contract-only"'),
+    'Expected startup core status to stay platform-neutral with contract-only mechanism.',
   );
 
   assert(
-    plan.launchdProgramArguments.join(' ') === 'node dist/cli.js restore',
-    `Expected launchd ProgramArguments to target restore entrypoint, got: ${plan.launchdProgramArguments.join(' ')}`,
-  );
-
-  assert(
-    plan.systemdExecStart === 'node dist/cli.js restore',
-    `Expected systemd ExecStart to target restore entrypoint, got: ${plan.systemdExecStart}`,
+    startupCoreSource.includes('restoreEntrypoint: "lifeline restore"'),
+    'Expected startup core to keep restore entrypoint as lifeline restore.',
   );
 }
 
-function verifyRegistrationStateInspection() {
-  const snapshot = inspectStartupRegistrationState({
-    status: 'enabled',
-    registrationId: 'lifeline-runtime-smoke-app-startup',
-    restoreEntrypoint: 'node dist/cli.js restore',
+function verifyStartupContractPlanning() {
+  const plan = buildStartupContractPlan({ action: 'enable' });
+
+  assert(plan.scope === 'machine-local', `Expected machine-local scope, got: ${plan.scope}`);
+  assert(
+    plan.restoreEntrypoint === 'lifeline restore',
+    `Expected deterministic restore entrypoint, got: ${plan.restoreEntrypoint}`,
+  );
+  assert(
+    plan.backendStatus === 'not-installed',
+    `Expected deferred backend status, got: ${plan.backendStatus}`,
+  );
+}
+
+function verifyContractStateInspection() {
+  const snapshot = inspectStartupContractState({
+    intent: 'enabled',
+    scope: 'machine-local',
+    restoreEntrypoint: 'lifeline restore',
+    backendStatus: 'not-installed',
   });
 
-  assert(snapshot.enabled, 'Expected startup state inspection to mark enabled status as true.');
+  assert(snapshot.enabled, 'Expected startup state inspection to mark enabled intent as true.');
   assert(
-    snapshot.restoreEntrypoint === 'node dist/cli.js restore',
+    snapshot.restoreEntrypoint === 'lifeline restore',
     `Expected startup state inspection to keep restore entrypoint, got ${snapshot.restoreEntrypoint}`,
   );
 }
 
 async function main() {
   await verifyRestoreEntrypointWiring();
-  verifyStartupCommandPlanning();
-  verifyRegistrationStateInspection();
+  await verifyContractSurfaceWiring();
+  verifyStartupContractPlanning();
+  verifyContractStateInspection();
   console.log('Wave 2 startup deterministic verification passed.');
 }
 

@@ -29,6 +29,7 @@ The CLI is the operator-facing entrypoint. Current commands:
 - `logs`
 - `restart`
 - `restore`
+- `startup` (contract-only in Wave 2)
 
 `up` resolves config and runs install/build, then launches a detached Lifeline supervisor process (not the app process directly).
 
@@ -42,10 +43,11 @@ Wave 1 runtime behavior:
 - bounded restart backoff with crash-loop cutoff
 - persisted runtime metadata in `.lifeline/state.json` (supervisor pid, child pid, restart counters, last exit)
 - `restore` reads persisted state and re-launches restorable supervisors idempotently
+- startup contract is configured via `startup` (contract-only in Wave 2)
 - cross-platform stop behavior: `taskkill /T /F` on Windows, process-group termination on POSIX
 
 Logs remain file-based at `.lifeline/logs/<app>.log` and include both app output and supervisor lifecycle events.
 
 ## Wave boundary
 
-Wave 2 adds the first OS startup registration backend on Windows via Task Scheduler, and it always routes login auto-start through `lifeline restore`.
+Wave 2 adds a platform-neutral startup registration contract and CLI surface for machine-local restore auto-start. OS-specific installers (Task Scheduler/systemd/launchd) are intentionally deferred and must be implemented behind this contract seam.

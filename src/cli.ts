@@ -13,7 +13,7 @@ import { runSupervisor } from "./core/supervisor.js";
 
 function printUsage(): void {
   console.log(
-    "Lifeline v1\n\nUsage:\n  lifeline validate <manifest-path> [--playbook-path <path>]\n  lifeline resolve <manifest-path> [--playbook-path <path>]\n  lifeline up <manifest-path> [--playbook-path <path>]\n  lifeline down <app-name>\n  lifeline status <app-name>\n  lifeline logs <app-name> [line-count]\n  lifeline restart <app-name> [--playbook-path <path>]\n  lifeline restore\n  lifeline startup <enable|disable|status>",
+    "Lifeline v1\n\nUsage:\n  lifeline validate <manifest-path> [--playbook-path <path>]\n  lifeline resolve <manifest-path> [--playbook-path <path>]\n  lifeline up <manifest-path> [--playbook-path <path>]\n  lifeline down <app-name>\n  lifeline status <app-name>\n  lifeline logs <app-name> [line-count]\n  lifeline restart <app-name> [--playbook-path <path>]\n  lifeline restore\n  lifeline startup <enable|disable|status> [--dry-run]",
   );
 }
 
@@ -121,7 +121,7 @@ async function main(argv: string[]): Promise<number> {
     case "restore":
       return runRestoreCommand();
     case "startup":
-      return runStartupCommand(target);
+      return runStartupCommand(target, option);
     case "supervise":
       if (!target) {
         console.error("Missing app name.");
