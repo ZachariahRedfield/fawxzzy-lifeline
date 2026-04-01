@@ -154,6 +154,7 @@ Run the smoke paths with:
 ```bash
 pnpm smoke:runtime
 pnpm smoke:playbook
+pnpm test:startup-deterministic
 ```
 
 CI uses the same canonical Playbook verification path: `pnpm smoke:playbook`.
@@ -189,6 +190,32 @@ YAML parsing and env-file parsing are implemented inside the repo because the co
 - [App manifest contract](docs/contracts/app-manifest.md)
 - [ADR 0001: Lifeline v1 scope](docs/adr/0001-lifeline-v1-scope.md)
 
+
+
+## Wave 2 startup registration operator workflow
+
+Wave 2 adds OS startup registration as a machine-integration layer on top of the existing runtime and restore flow. Keep usage narrow and deterministic:
+
+1. **Enable startup registration** so the OS invokes Lifeline restore on login/boot.
+   ```bash
+   pnpm lifeline startup enable <app-name>
+   ```
+2. **Inspect startup status** to confirm registration target, identity, and restore entrypoint.
+   ```bash
+   pnpm lifeline startup status <app-name>
+   ```
+3. **Disable startup registration** to cleanly remove machine-level wiring when you no longer want automatic restore.
+   ```bash
+   pnpm lifeline startup disable <app-name>
+   ```
+
+Expected interaction with `restore` stays explicit: startup registration should call the same restore entrypoint (`node dist/cli.js restore`) that operators run manually. Reboot simulation is optional; deterministic verification should focus on planned command generation, registration-state inspection, and restore-entrypoint wiring.
+
+**Rule:** Machine-integration features need deterministic verification even when literal reboot simulation is impractical.
+
+**Pattern:** Verify startup command planning, registration state inspection, and restore entrypoint wiring independently from real reboot execution.
+
+**Failure Mode:** Startup ships with hand-wavy docs and no deterministic checks, so registration breaks silently and operators cannot trust it.
 
 ## Wave 1 notes
 
