@@ -1,6 +1,6 @@
 # Lifeline
 
-Lifeline is the opinionated, self-hosted local operator for manifest-defined apps. This repository is intentionally narrow: Lifeline v1 validates manifests, resolves optional Playbook defaults from disk, and runs one stable local or staging-style instance on one machine.
+Lifeline is the opinionated, self-hosted local operator for manifest-defined apps. This repository is intentionally narrow: Lifeline v1 validates manifests, resolves optional Playbook defaults from disk, runs one stable local or staging-style instance on one machine, and includes the merged Wave 2 startup contract surface for deterministic `lifeline restore` startup intent management.
 
 ## Why Lifeline exists
 
@@ -136,11 +136,11 @@ pnpm lifeline startup enable --dry-run
 pnpm lifeline startup disable --dry-run
 ```
 
-Current Wave 2 slice behavior:
+Current merged Wave 2 startup-contract behavior:
 
 - `startup enable` records startup intent in `.lifeline/startup.json`.
 - `startup disable` clears startup intent in `.lifeline/startup.json`.
-- `startup status` reports scope, restore entrypoint, mechanism (`contract-only`), and backend readiness.
+- `startup status` reports scope, canonical restore entrypoint (`lifeline restore`), mechanism (`contract-only`), and backend readiness.
 - `--dry-run` prints the planned startup action without changing state.
 - OS-specific installer backends (Task Scheduler/systemd/launchd) are intentionally deferred and must plug in behind this contract.
 
@@ -181,6 +181,7 @@ Run the smoke paths with:
 pnpm smoke:runtime
 pnpm smoke:playbook
 pnpm test:startup-deterministic
+pnpm test:startup-roundtrip
 ```
 
 CI uses the same canonical Playbook verification path: `pnpm smoke:playbook`.

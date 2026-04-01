@@ -57,7 +57,9 @@
     "smoke:runtime:restart-invalid-persisted-manifest-path": "node scripts/smoke-runtime-restart-invalid-persisted-manifest-path.mjs",
     "smoke:runtime:up-missing-env-file": "node scripts/smoke-runtime-up-missing-env-file.mjs",
     "smoke:runtime:restore-missing-env-file": "node scripts/smoke-runtime-restore-missing-env-file.mjs",
-    "test:startup-deterministic": "node scripts/test-wave2-startup-deterministic.mjs"
+    "test:startup-deterministic": "node scripts/test-wave2-startup-deterministic.mjs",
+    "test:startup-roundtrip": "node scripts/test-startup-roundtrip-windows-deterministic.mjs",
+    "verify:startup-roundtrip": "pnpm lifeline startup enable && pnpm lifeline startup status && pnpm lifeline startup disable"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",

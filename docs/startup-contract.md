@@ -1,6 +1,6 @@
-# Startup contract (Wave 2)
+# Startup contract (merged Wave 2)
 
-Wave 2 defines Lifeline's startup-registration seam before any platform installers are implemented.
+Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior before any platform installers are implemented.
 
 ## Scope
 
@@ -22,6 +22,8 @@ Semantics:
 - `disable`: set startup intent to disabled.
 - `status`: report current contract state and backend readiness.
 - `--dry-run`: print the plan without writing state.
+
+The contract's canonical startup target is always `lifeline restore`; startup backends must reuse this entrypoint and must not introduce duplicate lifecycle logic.
 
 ## Persisted metadata
 

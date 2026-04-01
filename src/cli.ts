@@ -13,7 +13,7 @@ import { runSupervisor } from "./core/supervisor.js";
 
 function printUsage(): void {
   console.log(
-    "Lifeline v1\n\nUsage:\n  lifeline validate <manifest-path> [--playbook-path <path>]\n  lifeline resolve <manifest-path> [--playbook-path <path>]\n  lifeline up <manifest-path> [--playbook-path <path>]\n  lifeline down <app-name>\n  lifeline status <app-name>\n  lifeline logs <app-name> [line-count]\n  lifeline restart <app-name> [--playbook-path <path>]\n  lifeline restore\n  lifeline startup <enable|disable|status> [--dry-run]",
+    "Lifeline v1 + Wave 2 startup contract\n\nUsage:\n  lifeline validate <manifest-path> [--playbook-path <path>]\n  lifeline resolve <manifest-path> [--playbook-path <path>]\n  lifeline up <manifest-path> [--playbook-path <path>]\n  lifeline down <app-name>\n  lifeline status <app-name>\n  lifeline logs <app-name> [line-count]\n  lifeline restart <app-name> [--playbook-path <path>]\n  lifeline restore\n  lifeline startup <enable|disable|status> [--dry-run]",
   );
 }
 
