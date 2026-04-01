@@ -11,7 +11,7 @@ Lifeline provides a boring, low-maintenance way to describe how an app should be
 - A single-package TypeScript CLI for a manifest-defined local operator.
 - A home for a small, explicit app manifest contract.
 - A file-based config resolver that can optionally read Playbook archetype exports from a local checkout.
-- A runtime slice that can `resolve`, `up`, `down`, `status`, `logs`, `restart`, `restore`, and `validate` one app on one machine.
+- A runtime slice that can `resolve`, `up`, `down`, `status`, `logs`, `restart`, `restore`, `startup`, and `validate` one app on one machine.
 - Fixture-based smoke paths that verify manifest-only runtime behavior and Playbook-backed resolution without depending on an external Playbook repo.
 
 ## What Lifeline is not
@@ -40,6 +40,9 @@ pnpm lifeline status runtime-smoke-app
 pnpm lifeline logs runtime-smoke-app
 pnpm lifeline restart runtime-smoke-app
 pnpm lifeline restore
+pnpm lifeline startup status
+pnpm lifeline startup enable
+pnpm lifeline startup disable
 pnpm lifeline down runtime-smoke-app
 ```
 
@@ -118,6 +121,29 @@ Playbook archetype exports are sparse optional default bundles. They may omit an
 - `lifeline down` reclaims the real managed listener and waits for managed port release before reporting success
 - supports `lifeline restore` to restart restorable apps from persisted state
 
+
+## Windows startup registration (Wave 2)
+
+Lifeline Wave 2 adds startup registration through a platform-neutral startup contract. On Windows, the first backend uses Task Scheduler and always points startup to Lifeline's canonical restore flow.
+
+Commands:
+
+```bash
+pnpm lifeline startup status
+pnpm lifeline startup enable
+pnpm lifeline startup disable
+```
+
+Expected behavior on Windows:
+
+- `startup enable` creates/overwrites the deterministic machine-local task `\Lifeline\Restore`.
+- The registered task command is `node dist/cli.js restore` (or the packaged executable equivalent with `restore`).
+- `startup status` reports support, enablement state, backend mechanism, and whether the task points to the restore entrypoint.
+- `startup disable` removes `\Lifeline\Restore` and is safe to run when the task is already absent.
+- `startup enable` fails clearly when the required runtime executable or built CLI path is missing.
+
+Non-Windows platforms currently report startup as unsupported in Wave 2.
+
 ## Slim manifest example with Playbook defaults
 
 This manifest is intentionally incomplete on its own, but becomes runnable when paired with a Playbook export for the `node-web` archetype:
@@ -192,4 +218,4 @@ YAML parsing and env-file parsing are implemented inside the repo because the co
 
 ## Wave 1 notes
 
-Wave 1 adds a supervisor-backed lifecycle plus restore semantics. OS startup registration (login/reboot auto-start wiring) is intentionally deferred to Wave 2.
+Wave 1 added a supervisor-backed lifecycle plus restore semantics. Wave 2 adds Windows startup registration via Task Scheduler, wired to `lifeline restore`.

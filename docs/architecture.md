@@ -48,4 +48,4 @@ Logs remain file-based at `.lifeline/logs/<app>.log` and include both app output
 
 ## Wave boundary
 
-Wave 1 intentionally does **not** add OS startup registration (systemd/NSSM/Task Scheduler/etc). That is deferred to Wave 2 after supervisor and restore behavior are proven stable.
+Wave 2 adds the first OS startup registration backend on Windows via Task Scheduler, and it always routes login auto-start through `lifeline restore`.

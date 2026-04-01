@@ -47,4 +47,4 @@ The fitness app and Playbook UI remain the initial targets because they exercise
 
 ## Wave sequencing
 
-Wave 1 covers supervisor lifecycle + restore. OS startup registration (boot/login auto-start wiring) is explicitly out of scope until Wave 2.
+Wave 2 extends scope with Windows startup registration (Task Scheduler), wired to the canonical `lifeline restore` flow.
