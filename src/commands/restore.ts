@@ -1,7 +1,10 @@
+import path from "node:path";
+
 import {
   isProcessAlive,
   startDetachedCommand,
 } from "../core/process-manager.js";
+import { loadEnvFile } from "../core/load-env-file.js";
 import { resolveManifestConfig } from "../core/resolve-config.js";
 import { resolveWorkingDirectory } from "../core/resolve-working-directory.js";
 import { readState } from "../core/state-store.js";
@@ -42,6 +45,14 @@ export async function runRestoreCommand(): Promise<number> {
       });
 
       await resolveWorkingDirectory(app.manifestPath, resolved.resolvedManifest);
+      if (resolved.resolvedManifest.env.file) {
+        await loadEnvFile(
+          path.resolve(
+            path.dirname(app.manifestPath),
+            resolved.resolvedManifest.env.file,
+          ),
+        );
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Failed to restore ${app.name}: ${message}`);

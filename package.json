@@ -55,7 +55,8 @@
     "smoke:runtime:restart-missing-env-file": "node scripts/smoke-runtime-restart-missing-env-file.mjs",
     "smoke:runtime:restart-playbook-invalid-persisted-path": "node scripts/smoke-runtime-restart-playbook-invalid-persisted-path.mjs",
     "smoke:runtime:restart-invalid-persisted-manifest-path": "node scripts/smoke-runtime-restart-invalid-persisted-manifest-path.mjs",
-    "smoke:runtime:up-missing-env-file": "node scripts/smoke-runtime-up-missing-env-file.mjs"
+    "smoke:runtime:up-missing-env-file": "node scripts/smoke-runtime-up-missing-env-file.mjs",
+    "smoke:runtime:restore-missing-env-file": "node scripts/smoke-runtime-restore-missing-env-file.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
