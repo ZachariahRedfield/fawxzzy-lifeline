@@ -50,6 +50,7 @@
     "smoke:runtime:restore-playbook-persisted-path": "node scripts/smoke-runtime-restore-playbook-persisted-path.mjs",
     "smoke:runtime:restore-playbook-invalid-persisted-path": "node scripts/smoke-runtime-restore-playbook-invalid-persisted-path.mjs",
     "smoke:runtime:restore-missing-working-directory": "node scripts/smoke-runtime-restore-missing-working-directory.mjs",
+    "smoke:runtime:restart-missing-working-directory": "node scripts/smoke-runtime-restart-missing-working-directory.mjs",
     "smoke:runtime:restart-playbook-invalid-persisted-path": "node scripts/smoke-runtime-restart-playbook-invalid-persisted-path.mjs",
     "smoke:runtime:restart-invalid-persisted-manifest-path": "node scripts/smoke-runtime-restart-invalid-persisted-manifest-path.mjs"
   },
