@@ -15,7 +15,7 @@ const fixtureManifestPath =
 const statePath = ".lifeline/state.json";
 const appName = "runtime-smoke-app";
 
-const runtimePort = 4500 + Math.floor(Math.random() * 2000);
+let runtimePort;
 let manifestPath = fixtureManifestPath;
 let tempFixtureDir;
 let tempRootDir;
@@ -93,6 +93,29 @@ function canBindPort(port) {
   });
 }
 
+function allocateRuntimePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("Failed to allocate runtime smoke port")));
+        return;
+      }
+
+      const { port } = address;
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(port);
+      });
+    });
+  });
+}
+
 async function readRuntimeState() {
   const raw = await readFile(statePath, "utf8").catch(() => "");
   if (!raw) {
@@ -155,6 +178,7 @@ async function waitForRestartCountAtLeast(target) {
 }
 
 async function prepareFixtureConfig() {
+  runtimePort = await allocateRuntimePort();
   tempRootDir = await mkdtemp(path.join(tmpdir(), "lifeline-runtime-smoke-"));
   tempFixtureDir = path.join(tempRootDir, "runtime-smoke-app");
 
