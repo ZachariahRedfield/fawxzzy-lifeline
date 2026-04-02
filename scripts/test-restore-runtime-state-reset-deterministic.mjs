@@ -182,6 +182,9 @@ try {
     portOwnerPid: 99994,
     blockedReason: "stale-blocked-reason",
     startedAt: staleStartedAt,
+    crashLoopDetected: true,
+    lastExitCode: 137,
+    lastExitAt: "1999-12-31T23:59:59.000Z",
     lastKnownStatus: "running",
   });
 
@@ -249,6 +252,22 @@ try {
   if (persistedAfterRestore.lastKnownStatus !== "stopped") {
     throw new Error(
       `Expected restore to persist transitional status stopped, found ${persistedAfterRestore.lastKnownStatus}`,
+    );
+  }
+
+  if (persistedAfterRestore.crashLoopDetected) {
+    throw new Error("Expected crashLoopDetected to reset after restore launch.");
+  }
+
+  if (persistedAfterRestore.lastExitCode !== undefined) {
+    throw new Error(
+      `Expected lastExitCode to be cleared, found ${persistedAfterRestore.lastExitCode}`,
+    );
+  }
+
+  if (persistedAfterRestore.lastExitAt !== undefined) {
+    throw new Error(
+      `Expected lastExitAt to be cleared, found ${persistedAfterRestore.lastExitAt}`,
     );
   }
 

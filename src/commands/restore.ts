@@ -44,6 +44,7 @@ export async function runRestoreCommand(): Promise<number> {
     }
 
     const cliPath = process.argv[1] ?? "dist/cli.js";
+    const startedAt = new Date().toISOString();
     const supervisorPid = await startDetachedCommand({
       command: `${JSON.stringify(process.execPath)} ${JSON.stringify(cliPath)} supervise ${JSON.stringify(app.name)}`,
       cwd: process.cwd(),
@@ -59,8 +60,11 @@ export async function runRestoreCommand(): Promise<number> {
       listenerPid: undefined,
       portOwnerPid: undefined,
       blockedReason: undefined,
-      startedAt: new Date().toISOString(),
+      startedAt,
       lastKnownStatus: "stopped",
+      crashLoopDetected: false,
+      lastExitCode: undefined,
+      lastExitAt: undefined,
     });
 
     console.log(`Restored ${app.name} with supervisor pid ${supervisorPid}.`);
