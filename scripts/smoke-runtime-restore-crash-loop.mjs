@@ -137,9 +137,13 @@ try {
   if (crashLoopState.lastKnownStatus !== "crash-loop" || !crashLoopState.crashLoopDetected) {
     throw new Error(`Expected persisted crash-loop state before restore, found ${JSON.stringify(crashLoopState)}`);
   }
+  if (crashLoopState.lastExitCode !== 17) {
+    throw new Error(`Expected deterministic crash-loop exit code 17, found ${crashLoopState.lastExitCode}`);
+  }
 
   const restartCountBeforeRestore = crashLoopState.restartCount;
   const supervisorPidBeforeRestore = crashLoopState.supervisorPid;
+  const startedAtBeforeRestore = crashLoopState.startedAt;
 
   if (crashLoopState.childPid && isPidAlive(crashLoopState.childPid)) {
     throw new Error(`Expected no live child process before restore, found ${crashLoopState.childPid}`);
@@ -170,6 +174,11 @@ try {
   if (!restoreResult.stdout.includes("No restorable apps required restart.")) {
     throw new Error(
       `Expected restore output to report no eligible restarts after crash-loop skip.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+    );
+  }
+  if (restoreResult.stdout.includes("No managed apps found in .lifeline/state.json.")) {
+    throw new Error(
+      `Expected crash-loop restore to keep runtime history and not take no-history path.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
@@ -252,6 +261,12 @@ try {
   if (stateAfterRestore.restartCount !== restartCountBeforeRestore) {
     throw new Error(
       `Expected restartCount to remain unchanged across restore, was ${restartCountBeforeRestore}, now ${stateAfterRestore.restartCount}`,
+    );
+  }
+
+  if (stateAfterRestore.startedAt !== startedAtBeforeRestore) {
+    throw new Error(
+      `Expected restore skip not to reseed startedAt, was ${startedAtBeforeRestore}, now ${stateAfterRestore.startedAt}`,
     );
   }
 } catch (error) {
