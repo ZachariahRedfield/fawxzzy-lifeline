@@ -26,5 +26,8 @@ jobs:
 
       - run: pnpm build
 
+      - name: Smoke preflight
+        run: node scripts/lib/ensure-built.mjs
+
       # Canonical Playbook verification path in this repo: resolve+merge smoke checks.
       - run: pnpm smoke:playbook

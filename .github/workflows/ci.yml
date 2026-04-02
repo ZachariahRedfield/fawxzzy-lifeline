@@ -37,6 +37,9 @@ jobs:
       - name: Validate Playbook UI manifest
         run: pnpm lifeline validate examples/playbook-ui.lifeline.yml
 
+      - name: Smoke preflight
+        run: node scripts/lib/ensure-built.mjs
+
       - name: Runtime smoke verification
         run: pnpm smoke:runtime
 
