@@ -54,6 +54,13 @@ export async function runRestoreCommand(): Promise<number> {
     await upsertAppState({
       ...app,
       supervisorPid,
+      childPid: undefined,
+      wrapperPid: undefined,
+      listenerPid: undefined,
+      portOwnerPid: undefined,
+      blockedReason: undefined,
+      startedAt: new Date().toISOString(),
+      lastKnownStatus: "stopped",
     });
 
     console.log(`Restored ${app.name} with supervisor pid ${supervisorPid}.`);
