@@ -43,33 +43,46 @@ function defaultState(): StartupState {
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function sanitizeIntent(value: unknown): StartupIntent {
+  return value === "enabled" ? "enabled" : "disabled";
+}
+
+function sanitizeUpdatedAt(value: unknown): string {
+  if (typeof value === "string" && !Number.isNaN(Date.parse(value))) {
+    return value;
+  }
+
+  return new Date().toISOString();
+}
+
 async function readStartupState(): Promise<StartupState> {
   const raw = await readFile(STARTUP_STATE_PATH, "utf8").catch(() => "");
   if (!raw) {
     return defaultState();
   }
 
-  let parsed: Partial<StartupState>;
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(raw) as Partial<StartupState>;
+    parsed = JSON.parse(raw);
   } catch {
     return defaultState();
   }
 
-  const updatedAt =
-    typeof parsed.updatedAt === "string" && !Number.isNaN(Date.parse(parsed.updatedAt))
-      ? parsed.updatedAt
-      : new Date().toISOString();
+  if (!isRecord(parsed)) {
+    return defaultState();
+  }
 
   return {
-    ...defaultState(),
-    ...parsed,
     version: 1,
     scope: "machine-local",
     restoreEntrypoint: "lifeline restore",
     backendStatus: "not-installed",
-    intent: parsed.intent === "enabled" ? "enabled" : "disabled",
-    updatedAt,
+    intent: sanitizeIntent(parsed.intent),
+    updatedAt: sanitizeUpdatedAt(parsed.updatedAt),
   };
 }
 
