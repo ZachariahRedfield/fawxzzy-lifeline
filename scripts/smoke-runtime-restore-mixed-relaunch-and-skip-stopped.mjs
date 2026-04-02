@@ -12,13 +12,13 @@ const cli = ["node", "dist/cli.js"];
 const statePath = ".lifeline/state.json";
 
 const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-const appNameRunning = `runtime-smoke-restore-mixed-running-${uniqueSuffix}`;
-const appNameStopped = `runtime-smoke-restore-mixed-stopped-${uniqueSuffix}`;
-const runtimePortRunning = 8000 + Math.floor(Math.random() * 900);
-const runtimePortStopped = runtimePortRunning + 1000;
+const relaunchAppName = `runtime-smoke-restore-mixed-relaunch-${uniqueSuffix}`;
+const stoppedAppName = `runtime-smoke-restore-mixed-stopped-${uniqueSuffix}`;
+const relaunchPort = 7600 + Math.floor(Math.random() * 400);
+const stoppedPort = 8200 + Math.floor(Math.random() * 400);
 
-let manifestPathRunning = "fixtures/runtime-smoke-app/runtime-smoke-app.lifeline.yml";
-let manifestPathStopped = "fixtures/runtime-smoke-app/runtime-smoke-app.lifeline.yml";
+let relaunchManifestPath = "fixtures/runtime-smoke-app/runtime-smoke-app.lifeline.yml";
+let stoppedManifestPath = "fixtures/runtime-smoke-app/runtime-smoke-app.lifeline.yml";
 let tempRootDir;
 
 function run(args, { allowFailure = false } = {}) {
@@ -71,7 +71,6 @@ async function waitForPidExit(pid) {
     if (!isPidAlive(pid)) {
       return;
     }
-
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
@@ -104,7 +103,6 @@ async function waitForRuntime(appName, predicate, label) {
     if (state && predicate(state)) {
       return state;
     }
-
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
@@ -130,7 +128,6 @@ async function waitForPortRelease(port) {
     if (await canBindPort(port)) {
       return;
     }
-
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
@@ -159,205 +156,246 @@ async function waitForStoppedWithHistory(appName) {
 
   const latestStatus = await run(["status", appName], { allowFailure: true });
   throw new Error(
-    `Timed out waiting for stopped status output with persisted history for ${appName}.\nstdout:\n${latestStatus.stdout}\nstderr:\n${latestStatus.stderr}`,
+    `Timed out waiting for stopped status output with persisted history (${appName}).\nstdout:\n${latestStatus.stdout}\nstderr:\n${latestStatus.stderr}`,
   );
 }
 
-async function createFixtureManifest({ appName, runtimePort, fixtureSubdir }) {
-  const tempFixtureDir = path.join(tempRootDir, fixtureSubdir);
+async function prepareFixtureConfig() {
+  tempRootDir = await mkdtemp(path.join(tmpdir(), "lifeline-runtime-restore-mixed-smoke-"));
 
-  await cp("fixtures/runtime-smoke-app", tempFixtureDir, { recursive: true });
+  const relaunchFixtureDir = path.join(tempRootDir, "runtime-smoke-app-relaunch");
+  await cp("fixtures/runtime-smoke-app", relaunchFixtureDir, { recursive: true });
 
-  const envPath = path.join(tempFixtureDir, ".env.runtime");
-  const envRaw = await readFile(envPath, "utf8");
-  await writeFile(envPath, envRaw.replace(/^PORT=.*$/m, `PORT=${runtimePort}`), "utf8");
+  const relaunchEnvPath = path.join(relaunchFixtureDir, ".env.runtime");
+  const relaunchEnvRaw = await readFile(relaunchEnvPath, "utf8");
+  await writeFile(
+    relaunchEnvPath,
+    relaunchEnvRaw.replace(/^PORT=.*$/m, `PORT=${relaunchPort}`),
+    "utf8",
+  );
 
-  const tempManifestPath = path.join(tempFixtureDir, "runtime-smoke-app.lifeline.yml");
-  const manifestRaw = await readFile(tempManifestPath, "utf8");
-  const nextManifest = manifestRaw
-    .replace(/^name: .*$/m, `name: ${appName}`)
-    .replace(/^port: .*$/m, `port: ${runtimePort}`)
+  const relaunchTempManifestPath = path.join(relaunchFixtureDir, "runtime-smoke-app.lifeline.yml");
+  const relaunchManifestRaw = await readFile(relaunchTempManifestPath, "utf8");
+  const manifestForRelaunch = relaunchManifestRaw
+    .replace(/^name: .*$/m, `name: ${relaunchAppName}`)
+    .replace(/^port: .*$/m, `port: ${relaunchPort}`)
     .replace(/^  restartPolicy: .*$/m, "  restartPolicy: never")
     .replace(/^  restorable: .*$/m, "  restorable: true");
+  await writeFile(relaunchTempManifestPath, manifestForRelaunch, "utf8");
+  relaunchManifestPath = relaunchTempManifestPath;
 
-  await writeFile(tempManifestPath, nextManifest, "utf8");
-  return tempManifestPath;
-}
+  const stoppedFixtureDir = path.join(tempRootDir, "runtime-smoke-app-stopped");
+  await cp("fixtures/runtime-smoke-app", stoppedFixtureDir, { recursive: true });
 
-async function prepareFixtureConfigs() {
-  tempRootDir = await mkdtemp(path.join(tmpdir(), "lifeline-runtime-restore-mixed-smoke-"));
-  manifestPathRunning = await createFixtureManifest({
-    appName: appNameRunning,
-    runtimePort: runtimePortRunning,
-    fixtureSubdir: "runtime-smoke-app-running",
-  });
-  manifestPathStopped = await createFixtureManifest({
-    appName: appNameStopped,
-    runtimePort: runtimePortStopped,
-    fixtureSubdir: "runtime-smoke-app-stopped",
-  });
+  const stoppedEnvPath = path.join(stoppedFixtureDir, ".env.runtime");
+  const stoppedEnvRaw = await readFile(stoppedEnvPath, "utf8");
+  await writeFile(stoppedEnvPath, stoppedEnvRaw.replace(/^PORT=.*$/m, `PORT=${stoppedPort}`), "utf8");
+
+  const stoppedTempManifestPath = path.join(stoppedFixtureDir, "runtime-smoke-app.lifeline.yml");
+  const stoppedManifestRaw = await readFile(stoppedTempManifestPath, "utf8");
+  const manifestForStoppedHistory = stoppedManifestRaw
+    .replace(/^name: .*$/m, `name: ${stoppedAppName}`)
+    .replace(/^port: .*$/m, `port: ${stoppedPort}`)
+    .replace(/^  restartPolicy: .*$/m, "  restartPolicy: never")
+    .replace(/^  restorable: .*$/m, "  restorable: true");
+  await writeFile(stoppedTempManifestPath, manifestForStoppedHistory, "utf8");
+  stoppedManifestPath = stoppedTempManifestPath;
 }
 
 async function cleanup() {
-  await run(["down", appNameRunning], { allowFailure: true });
-  await run(["down", appNameStopped], { allowFailure: true });
+  await run(["down", relaunchAppName], { allowFailure: true });
+  await run(["down", stoppedAppName], { allowFailure: true });
 }
 
 try {
-  await prepareFixtureConfigs();
+  await prepareFixtureConfig();
   await cleanup();
 
-  await run(["up", manifestPathRunning]);
-  const runningStartedState = await waitForRunning(appNameRunning);
+  await run(["up", relaunchManifestPath]);
+  await run(["up", stoppedManifestPath]);
 
-  process.kill(runningStartedState.supervisorPid, "SIGKILL");
-  await waitForPidExit(runningStartedState.supervisorPid);
-  process.kill(runningStartedState.childPid, "SIGKILL");
-  await waitForPidExit(runningStartedState.childPid);
-  await waitForPortRelease(runtimePortRunning);
+  const relaunchStartedState = await waitForRunning(relaunchAppName);
+  const stoppedStartedState = await waitForRunning(stoppedAppName);
 
-  const runningPersistedBeforeRestore = await readRuntimeState(appNameRunning);
-  if (
-    !runningPersistedBeforeRestore ||
-    runningPersistedBeforeRestore.lastKnownStatus !== "running" ||
-    !runningPersistedBeforeRestore.restorable
-  ) {
+  if (relaunchStartedState.lastKnownStatus !== "running" || !relaunchStartedState.restorable) {
     throw new Error(
-      `Expected stale restorable running state for ${appNameRunning} before restore, found ${JSON.stringify(runningPersistedBeforeRestore)}`,
+      `Expected relaunch app to have persisted running+restorable state before runtime loss, found ${JSON.stringify(relaunchStartedState)}`,
     );
   }
 
-  await run(["up", manifestPathStopped]);
-  const stoppedStartedState = await waitForRunning(appNameStopped);
+  process.kill(relaunchStartedState.supervisorPid, "SIGKILL");
+  await waitForPidExit(relaunchStartedState.supervisorPid);
+  process.kill(relaunchStartedState.childPid, "SIGKILL");
+  await waitForPidExit(relaunchStartedState.childPid);
+  await waitForPortRelease(relaunchPort);
 
   process.kill(stoppedStartedState.childPid, "SIGKILL");
   await waitForPidExit(stoppedStartedState.childPid);
-  const stoppedSnapshot = await waitForStoppedWithHistory(appNameStopped);
-  const stoppedPersistedBeforeRestore = stoppedSnapshot.state;
-  if (!stoppedPersistedBeforeRestore || stoppedPersistedBeforeRestore.lastKnownStatus !== "stopped") {
+
+  const stoppedSnapshot = await waitForStoppedWithHistory(stoppedAppName);
+  const stoppedBeforeRestore = stoppedSnapshot.state;
+  if (!stoppedBeforeRestore) {
+    throw new Error("Expected stopped app to keep persisted history before restore");
+  }
+
+  const relaunchBeforeRestore = await readRuntimeState(relaunchAppName);
+  if (!relaunchBeforeRestore) {
+    throw new Error("Expected relaunch app to keep persisted state before restore");
+  }
+
+  if (relaunchBeforeRestore.lastKnownStatus !== "running" || !relaunchBeforeRestore.restorable) {
     throw new Error(
-      `Expected stopped-with-history state for ${appNameStopped} before restore, found ${JSON.stringify(stoppedPersistedBeforeRestore)}`,
+      `Expected stale running+restorable state for relaunch app before restore, found ${JSON.stringify(relaunchBeforeRestore)}`,
     );
+  }
+
+  if (stoppedBeforeRestore.lastKnownStatus !== "stopped") {
+    throw new Error(
+      `Expected stopped app persisted status to settle to stopped before restore, found ${stoppedBeforeRestore.lastKnownStatus}`,
+    );
+  }
+
+  const stoppedPortReleasedBeforeRestore = await canBindPort(stoppedPort);
+  if (!stoppedPortReleasedBeforeRestore) {
+    throw new Error(`Expected stopped app port ${stoppedPort} to be free before restore`);
   }
 
   const restoreResult = await run(["restore"], { allowFailure: true });
   if (restoreResult.code !== 0) {
     throw new Error(
-      `Expected mixed restore command to succeed.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+      `Expected restore command to succeed for mixed batch.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
-  if (!restoreResult.stdout.includes(`Restored ${appNameRunning} with supervisor pid`)) {
+  if (!restoreResult.stdout.includes(`Restored ${relaunchAppName} with supervisor pid`)) {
     throw new Error(
-      `Expected restore output to relaunch eligible app ${appNameRunning}.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+      `Expected restore output to confirm relaunch app restart.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
   if (
     !restoreResult.stdout.includes(
-      `Skipping ${appNameStopped}: last known status is stopped; not restorable as running.`,
+      `Skipping ${stoppedAppName}: last known status is stopped; not restorable as running.`,
     )
   ) {
     throw new Error(
-      `Expected restore output to skip stopped app ${appNameStopped}.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+      `Expected restore output to explicitly skip stopped app in mixed batch.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
   if (restoreResult.stdout.includes("No managed apps found in .lifeline/state.json.")) {
     throw new Error(
-      `Expected restore not to misclassify mixed state as no-history.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+      `Expected restore not to report missing runtime history in mixed batch.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
-  const runningRestoredState = await waitForRunning(appNameRunning);
-  if (runningRestoredState.supervisorPid === runningStartedState.supervisorPid) {
-    throw new Error(`Expected ${appNameRunning} to receive a new supervisor pid after restore`);
-  }
-
-  if (runningRestoredState.childPid === runningStartedState.childPid) {
-    throw new Error(`Expected ${appNameRunning} to receive a new child pid after restore`);
-  }
-
-  const runningStatusAfterRestore = await run(["status", appNameRunning], { allowFailure: true });
-  if (runningStatusAfterRestore.code !== 0) {
+  if (restoreResult.stdout.includes(`No runtime state found for ${relaunchAppName}`)) {
     throw new Error(
-      `Expected running status for restored app ${appNameRunning}.\nstdout:\n${runningStatusAfterRestore.stdout}\nstderr:\n${runningStatusAfterRestore.stderr}`,
+      `Expected relaunch app not to hit no-history confusion in mixed restore.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
-  if (!runningStatusAfterRestore.stdout.includes(`App ${appNameRunning} is running.`)) {
+  if (restoreResult.stdout.includes(`No runtime state found for ${stoppedAppName}`)) {
     throw new Error(
-      `Expected restored app ${appNameRunning} to report running status.\nstdout:\n${runningStatusAfterRestore.stdout}\nstderr:\n${runningStatusAfterRestore.stderr}`,
+      `Expected stopped app not to hit no-history confusion in mixed restore.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
-  if (!runningStatusAfterRestore.stdout.includes(`- portOwner: pid ${runningRestoredState.childPid}`)) {
+  const relaunchAfterRestore = await waitForRunning(relaunchAppName);
+  if (relaunchAfterRestore.supervisorPid === relaunchStartedState.supervisorPid) {
     throw new Error(
-      `Expected restored app ${appNameRunning} child pid ${runningRestoredState.childPid} to own the managed port.\nstdout:\n${runningStatusAfterRestore.stdout}\nstderr:\n${runningStatusAfterRestore.stderr}`,
+      `Expected restore to launch a new relaunch-app supervisor pid, still ${relaunchAfterRestore.supervisorPid}`,
     );
   }
 
-  if (!runningStatusAfterRestore.stdout.includes("- health: ok")) {
+  if (relaunchAfterRestore.childPid === relaunchStartedState.childPid) {
     throw new Error(
-      `Expected restored app ${appNameRunning} to be healthy.\nstdout:\n${runningStatusAfterRestore.stdout}\nstderr:\n${runningStatusAfterRestore.stderr}`,
+      `Expected restore to launch a new relaunch-app child pid, still ${relaunchAfterRestore.childPid}`,
     );
   }
 
-  if (runningStatusAfterRestore.stdout.includes("No runtime state found")) {
+  const relaunchStatusAfterRestore = await run(["status", relaunchAppName], {
+    allowFailure: true,
+  });
+  if (relaunchStatusAfterRestore.code !== 0) {
     throw new Error(
-      `Expected restored app ${appNameRunning} status to avoid no-history confusion.\nstdout:\n${runningStatusAfterRestore.stdout}\nstderr:\n${runningStatusAfterRestore.stderr}`,
+      `Expected relaunch app to be healthy after restore.\nstdout:\n${relaunchStatusAfterRestore.stdout}\nstderr:\n${relaunchStatusAfterRestore.stderr}`,
     );
   }
 
-  const stoppedPersistedAfterRestore = await readRuntimeState(appNameStopped);
-  if (!stoppedPersistedAfterRestore || stoppedPersistedAfterRestore.lastKnownStatus !== "stopped") {
+  if (!relaunchStatusAfterRestore.stdout.includes(`App ${relaunchAppName} is running.`)) {
     throw new Error(
-      `Expected stopped app ${appNameStopped} to remain stopped in persisted state after restore, found ${JSON.stringify(stoppedPersistedAfterRestore)}`,
+      `Expected relaunch app status to be running after restore.\nstdout:\n${relaunchStatusAfterRestore.stdout}\nstderr:\n${relaunchStatusAfterRestore.stderr}`,
     );
   }
 
-  if (stoppedPersistedAfterRestore.supervisorPid !== stoppedPersistedBeforeRestore.supervisorPid) {
-    throw new Error(
-      `Expected stopped app ${appNameStopped} not to receive a new supervisor pid. before=${stoppedPersistedBeforeRestore.supervisorPid} after=${stoppedPersistedAfterRestore.supervisorPid}`,
-    );
-  }
-
-  if (stoppedPersistedAfterRestore.childPid !== stoppedPersistedBeforeRestore.childPid) {
-    throw new Error(
-      `Expected stopped app ${appNameStopped} not to receive a new child pid. before=${stoppedPersistedBeforeRestore.childPid} after=${stoppedPersistedAfterRestore.childPid}`,
-    );
-  }
-
-  if (isPidAlive(stoppedPersistedAfterRestore.supervisorPid)) {
-    throw new Error(
-      `Expected stopped app ${appNameStopped} supervisor pid ${stoppedPersistedAfterRestore.supervisorPid} to remain offline`,
-    );
-  }
-
-  if (isPidAlive(stoppedPersistedAfterRestore.childPid)) {
-    throw new Error(
-      `Expected stopped app ${appNameStopped} child pid ${stoppedPersistedAfterRestore.childPid} to remain offline`,
-    );
-  }
-
-  const stoppedPortReleasedAfterRestore = await canBindPort(runtimePortStopped);
-  if (!stoppedPortReleasedAfterRestore) {
-    throw new Error(`Expected stopped app ${appNameStopped} port ${runtimePortStopped} to remain free`);
-  }
-
-  const stoppedStatusAfterRestore = await run(["status", appNameStopped], { allowFailure: true });
   if (
-    stoppedStatusAfterRestore.code === 0 ||
-    !stoppedStatusAfterRestore.stdout.includes(`App ${appNameStopped} is stopped.`)
+    !relaunchStatusAfterRestore.stdout.includes(`- portOwner: pid ${relaunchAfterRestore.childPid}`)
   ) {
     throw new Error(
-      `Expected stopped app ${appNameStopped} status to remain stopped after restore.\nstdout:\n${stoppedStatusAfterRestore.stdout}\nstderr:\n${stoppedStatusAfterRestore.stderr}`,
+      `Expected relaunch managed child pid ${relaunchAfterRestore.childPid} to own runtime port.\nstdout:\n${relaunchStatusAfterRestore.stdout}\nstderr:\n${relaunchStatusAfterRestore.stderr}`,
+    );
+  }
+
+  if (!relaunchStatusAfterRestore.stdout.includes("- health: ok")) {
+    throw new Error(
+      `Expected relaunch app health output after mixed restore.\nstdout:\n${relaunchStatusAfterRestore.stdout}\nstderr:\n${relaunchStatusAfterRestore.stderr}`,
+    );
+  }
+
+  const stoppedAfterRestore = await readRuntimeState(stoppedAppName);
+  if (!stoppedAfterRestore) {
+    throw new Error("Expected stopped app persisted state to remain after restore skip");
+  }
+
+  if (stoppedAfterRestore.lastKnownStatus !== "stopped") {
+    throw new Error(
+      `Expected stopped app to remain stopped after restore skip, found ${stoppedAfterRestore.lastKnownStatus}`,
+    );
+  }
+
+  if (stoppedAfterRestore.supervisorPid !== stoppedBeforeRestore.supervisorPid) {
+    throw new Error(
+      `Expected stopped app supervisor pid to remain unchanged on restore skip, before=${stoppedBeforeRestore.supervisorPid} after=${stoppedAfterRestore.supervisorPid}`,
+    );
+  }
+
+  if (stoppedAfterRestore.childPid !== stoppedBeforeRestore.childPid) {
+    throw new Error(
+      `Expected stopped app child pid to remain unchanged on restore skip, before=${stoppedBeforeRestore.childPid} after=${stoppedAfterRestore.childPid}`,
+    );
+  }
+
+  if (isPidAlive(stoppedAfterRestore.supervisorPid)) {
+    throw new Error(
+      `Expected stopped app supervisor to remain offline, but pid ${stoppedAfterRestore.supervisorPid} is alive`,
+    );
+  }
+
+  if (isPidAlive(stoppedAfterRestore.childPid)) {
+    throw new Error(
+      `Expected stopped app child to remain offline, but pid ${stoppedAfterRestore.childPid} is alive`,
+    );
+  }
+
+  const stoppedPortReleasedAfterRestore = await canBindPort(stoppedPort);
+  if (!stoppedPortReleasedAfterRestore) {
+    throw new Error(`Expected stopped app port ${stoppedPort} to remain free after restore skip`);
+  }
+
+  const stoppedStatusAfterRestore = await run(["status", stoppedAppName], { allowFailure: true });
+  if (
+    stoppedStatusAfterRestore.code === 0 ||
+    !stoppedStatusAfterRestore.stdout.includes(`App ${stoppedAppName} is stopped.`)
+  ) {
+    throw new Error(
+      `Expected stopped app status to remain stopped after mixed restore.\nstdout:\n${stoppedStatusAfterRestore.stdout}\nstderr:\n${stoppedStatusAfterRestore.stderr}`,
     );
   }
 
   if (stoppedStatusAfterRestore.stdout.includes("No runtime state found")) {
     throw new Error(
-      `Expected stopped app ${appNameStopped} status to avoid no-history confusion.\nstdout:\n${stoppedStatusAfterRestore.stdout}\nstderr:\n${stoppedStatusAfterRestore.stderr}`,
+      `Expected stopped app status not to report no-history confusion after mixed restore.\nstdout:\n${stoppedStatusAfterRestore.stdout}\nstderr:\n${stoppedStatusAfterRestore.stderr}`,
     );
   }
 } catch (error) {
