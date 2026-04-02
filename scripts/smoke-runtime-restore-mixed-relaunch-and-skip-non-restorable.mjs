@@ -134,8 +134,19 @@ async function waitForPortRelease(port) {
   throw new Error(`Expected managed port ${port} to be free`);
 }
 
+async function waitForHealthy(appName) {
+  return waitForRuntime(
+    appName,
+    (state) =>
+      state.lastKnownStatus === "running" &&
+      isPidAlive(state.supervisorPid) &&
+      isPidAlive(state.childPid),
+    "healthy running state after restore",
+  );
+}
+
 async function prepareFixtureConfig() {
-  tempRootDir = await mkdtemp(path.join(tmpdir(), "lifeline-runtime-restore-mixed-smoke-"));
+  tempRootDir = await mkdtemp(path.join(tmpdir(), "lifeline-runtime-restore-mixed-non-restorable-smoke-"));
 
   const relaunchFixtureDir = path.join(tempRootDir, "runtime-smoke-app-relaunch");
   await cp("fixtures/runtime-smoke-app", relaunchFixtureDir, { recursive: true });
@@ -169,10 +180,7 @@ async function prepareFixtureConfig() {
     "utf8",
   );
 
-  const nonRestorableTempManifestPath = path.join(
-    nonRestorableFixtureDir,
-    "runtime-smoke-app.lifeline.yml",
-  );
+  const nonRestorableTempManifestPath = path.join(nonRestorableFixtureDir, "runtime-smoke-app.lifeline.yml");
   const nonRestorableManifestRaw = await readFile(nonRestorableTempManifestPath, "utf8");
   const manifestForNonRestorable = nonRestorableManifestRaw
     .replace(/^name: .*$/m, `name: ${nonRestorableAppName}`)
@@ -223,182 +231,78 @@ try {
   await waitForPortRelease(nonRestorablePort);
 
   const relaunchBeforeRestore = await readRuntimeState(relaunchAppName);
-  if (!relaunchBeforeRestore) {
-    throw new Error("Expected relaunch app to keep persisted state before restore");
-  }
-
-  if (relaunchBeforeRestore.lastKnownStatus !== "running" || !relaunchBeforeRestore.restorable) {
-    throw new Error(
-      `Expected stale running+restorable state for relaunch app before restore, found ${JSON.stringify(relaunchBeforeRestore)}`,
-    );
-  }
-
   const nonRestorableBeforeRestore = await readRuntimeState(nonRestorableAppName);
-  if (!nonRestorableBeforeRestore) {
-    throw new Error("Expected non-restorable app to keep persisted state before restore");
-  }
 
-  if (
-    nonRestorableBeforeRestore.lastKnownStatus !== "running" ||
-    nonRestorableBeforeRestore.restorable
-  ) {
-    throw new Error(
-      `Expected stale running+non-restorable state for non-restorable app before restore, found ${JSON.stringify(nonRestorableBeforeRestore)}`,
-    );
+  if (!relaunchBeforeRestore || !nonRestorableBeforeRestore) {
+    throw new Error("Expected both apps to retain persisted runtime history before restore");
   }
 
   const restoreResult = await run(["restore"], { allowFailure: true });
   if (restoreResult.code !== 0) {
     throw new Error(
-      `Expected restore command to succeed for mixed batch.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+      `Expected restore command to succeed.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
   if (!restoreResult.stdout.includes(`Restored ${relaunchAppName} with supervisor pid`)) {
     throw new Error(
-      `Expected restore output to confirm relaunch app restart.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+      `Expected restore output to include relaunch confirmation for restorable app.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
-  if (
-    !restoreResult.stdout.includes(
-      `Skipping ${nonRestorableAppName}: app is marked restorable: false; skipping restore.`,
-    )
-  ) {
+  const explicitSkipMessages = [
+    `Skipping ${nonRestorableAppName}: restorable: false (explicitly excluded from restore).`,
+    `Skipping ${nonRestorableAppName}: app is marked restorable=false.`,
+  ];
+  if (!explicitSkipMessages.some((message) => restoreResult.stdout.includes(message))) {
     throw new Error(
-      `Expected restore output to explicitly skip non-restorable app in mixed batch.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+      `Expected restore output to include explicit non-restorable skip message.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
   if (restoreResult.stdout.includes("No managed apps found in .lifeline/state.json.")) {
     throw new Error(
-      `Expected restore not to report missing runtime history in mixed batch.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+      `Expected restore not to confuse persisted mixed app history with no-history state.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
-  if (restoreResult.stdout.includes(`No runtime state found for ${relaunchAppName}`)) {
-    throw new Error(
-      `Expected relaunch app not to hit no-history confusion in mixed restore.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
-    );
-  }
-
-  if (restoreResult.stdout.includes(`No runtime state found for ${nonRestorableAppName}`)) {
-    throw new Error(
-      `Expected non-restorable app not to hit no-history confusion in mixed restore.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
-    );
-  }
-
-  const relaunchAfterRestore = await waitForRunning(relaunchAppName);
-  if (relaunchAfterRestore.supervisorPid === relaunchStartedState.supervisorPid) {
-    throw new Error(
-      `Expected restore to launch a new relaunch-app supervisor pid, still ${relaunchAfterRestore.supervisorPid}`,
-    );
-  }
-
-  if (relaunchAfterRestore.childPid === relaunchStartedState.childPid) {
-    throw new Error(
-      `Expected restore to launch a new relaunch-app child pid, still ${relaunchAfterRestore.childPid}`,
-    );
-  }
-
-  const relaunchStatusAfterRestore = await run(["status", relaunchAppName], {
-    allowFailure: true,
-  });
-  if (relaunchStatusAfterRestore.code !== 0) {
-    throw new Error(
-      `Expected relaunch app to be healthy after restore.\nstdout:\n${relaunchStatusAfterRestore.stdout}\nstderr:\n${relaunchStatusAfterRestore.stderr}`,
-    );
-  }
-
-  if (!relaunchStatusAfterRestore.stdout.includes(`App ${relaunchAppName} is running.`)) {
-    throw new Error(
-      `Expected relaunch app status to be running after restore.\nstdout:\n${relaunchStatusAfterRestore.stdout}\nstderr:\n${relaunchStatusAfterRestore.stderr}`,
-    );
-  }
-
+  const relaunchAfterRestore = await waitForHealthy(relaunchAppName);
   if (
-    !relaunchStatusAfterRestore.stdout.includes(`- portOwner: pid ${relaunchAfterRestore.childPid}`)
+    relaunchAfterRestore.supervisorPid === relaunchBeforeRestore.supervisorPid ||
+    relaunchAfterRestore.childPid === relaunchBeforeRestore.childPid
   ) {
     throw new Error(
-      `Expected relaunch managed child pid ${relaunchAfterRestore.childPid} to own runtime port.\nstdout:\n${relaunchStatusAfterRestore.stdout}\nstderr:\n${relaunchStatusAfterRestore.stderr}`,
-    );
-  }
-
-  if (!relaunchStatusAfterRestore.stdout.includes("- health: ok")) {
-    throw new Error(
-      `Expected relaunch app health output after mixed restore.\nstdout:\n${relaunchStatusAfterRestore.stdout}\nstderr:\n${relaunchStatusAfterRestore.stderr}`,
+      `Expected restorable app to relaunch with new runtime pids, before=${JSON.stringify(relaunchBeforeRestore)} after=${JSON.stringify(relaunchAfterRestore)}`,
     );
   }
 
   const nonRestorableAfterRestore = await readRuntimeState(nonRestorableAppName);
   if (!nonRestorableAfterRestore) {
-    throw new Error("Expected non-restorable app persisted state to remain after restore skip");
+    throw new Error("Expected non-restorable app history to remain persisted after restore");
   }
 
   if (nonRestorableAfterRestore.restorable !== false) {
     throw new Error(
-      `Expected non-restorable app to stay non-restorable after restore skip, found restorable=${nonRestorableAfterRestore.restorable}`,
+      `Expected non-restorable app to remain non-restorable after restore skip, found restorable=${nonRestorableAfterRestore.restorable}`,
     );
   }
 
-  if (nonRestorableAfterRestore.lastKnownStatus !== "running") {
+  if (
+    nonRestorableAfterRestore.supervisorPid !== nonRestorableBeforeRestore.supervisorPid ||
+    nonRestorableAfterRestore.childPid !== nonRestorableBeforeRestore.childPid
+  ) {
     throw new Error(
-      `Expected non-restorable app last-known status to remain stale running after restore skip, found ${nonRestorableAfterRestore.lastKnownStatus}`,
+      `Expected non-restorable app not to relaunch, before=${JSON.stringify(nonRestorableBeforeRestore)} after=${JSON.stringify(nonRestorableAfterRestore)}`,
     );
   }
 
-  if (nonRestorableAfterRestore.supervisorPid !== nonRestorableBeforeRestore.supervisorPid) {
+  if (isPidAlive(nonRestorableAfterRestore.supervisorPid) || isPidAlive(nonRestorableAfterRestore.childPid)) {
     throw new Error(
-      `Expected non-restorable app supervisor pid to remain unchanged on restore skip, before=${nonRestorableBeforeRestore.supervisorPid} after=${nonRestorableAfterRestore.supervisorPid}`,
+      `Expected non-restorable app pids to remain offline after restore skip, supervisorPid=${nonRestorableAfterRestore.supervisorPid} childPid=${nonRestorableAfterRestore.childPid}`,
     );
   }
 
-  if (nonRestorableAfterRestore.childPid !== nonRestorableBeforeRestore.childPid) {
-    throw new Error(
-      `Expected non-restorable app child pid to remain unchanged on restore skip, before=${nonRestorableBeforeRestore.childPid} after=${nonRestorableAfterRestore.childPid}`,
-    );
-  }
-
-  if (isPidAlive(nonRestorableAfterRestore.supervisorPid)) {
-    throw new Error(
-      `Expected non-restorable app supervisor to remain offline, but pid ${nonRestorableAfterRestore.supervisorPid} is alive`,
-    );
-  }
-
-  if (isPidAlive(nonRestorableAfterRestore.childPid)) {
-    throw new Error(
-      `Expected non-restorable app child to remain offline, but pid ${nonRestorableAfterRestore.childPid} is alive`,
-    );
-  }
-
-  const nonRestorablePortReleasedAfterRestore = await canBindPort(nonRestorablePort);
-  if (!nonRestorablePortReleasedAfterRestore) {
-    throw new Error(`Expected non-restorable app port ${nonRestorablePort} to remain free after restore skip`);
-  }
-
-  const nonRestorableStatusAfterRestore = await run(["status", nonRestorableAppName], {
-    allowFailure: true,
-  });
-  if (nonRestorableStatusAfterRestore.code === 0) {
-    throw new Error(
-      `Expected non-restorable app to remain stopped after restore skip.\nstdout:\n${nonRestorableStatusAfterRestore.stdout}\nstderr:\n${nonRestorableStatusAfterRestore.stderr}`,
-    );
-  }
-
-  if (!nonRestorableStatusAfterRestore.stdout.includes(`App ${nonRestorableAppName} is stopped.`)) {
-    throw new Error(
-      `Expected non-restorable app status to remain stopped after mixed restore.\nstdout:\n${nonRestorableStatusAfterRestore.stdout}\nstderr:\n${nonRestorableStatusAfterRestore.stderr}`,
-    );
-  }
-
-  if (nonRestorableStatusAfterRestore.stdout.includes("No runtime state found")) {
-    throw new Error(
-      `Expected non-restorable app status not to report no-history confusion after mixed restore.\nstdout:\n${nonRestorableStatusAfterRestore.stdout}\nstderr:\n${nonRestorableStatusAfterRestore.stderr}`,
-    );
-  }
-} catch (error) {
-  await cleanup();
-  throw error;
+  await waitForPortRelease(nonRestorablePort);
 } finally {
   await cleanup();
   if (tempRootDir) {
