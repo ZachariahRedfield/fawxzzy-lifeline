@@ -49,8 +49,18 @@ export async function readState(): Promise<RuntimeStateFile> {
     return { apps: {} };
   }
 
-  const parsed = JSON.parse(raw) as Partial<RuntimeStateFile>;
-  return { apps: parsed.apps ?? {} };
+  let parsed: Partial<RuntimeStateFile>;
+  try {
+    parsed = JSON.parse(raw) as Partial<RuntimeStateFile>;
+  } catch {
+    return { apps: {} };
+  }
+
+  const apps =
+    parsed.apps && typeof parsed.apps === "object" && !Array.isArray(parsed.apps)
+      ? parsed.apps
+      : {};
+  return { apps };
 }
 
 export async function writeState(state: RuntimeStateFile): Promise<void> {
