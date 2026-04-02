@@ -18,8 +18,9 @@ export async function loadEnvFile(
   const lines = raw.split(/\r?\n/);
 
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]?.trim() ?? "";
-    if (line.length === 0 || line.startsWith("#")) {
+    const line = lines[index] ?? "";
+    const trimmedLine = line.trim();
+    if (trimmedLine.length === 0 || trimmedLine.startsWith("#")) {
       continue;
     }
 
