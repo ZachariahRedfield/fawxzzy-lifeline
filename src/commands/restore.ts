@@ -2,7 +2,7 @@ import {
   isProcessAlive,
   startDetachedCommand,
 } from "../core/process-manager.js";
-import { readState } from "../core/state-store.js";
+import { readState, upsertAppState } from "../core/state-store.js";
 import { prepareRuntimeApp } from "./up.js";
 
 export async function runRestoreCommand(): Promise<number> {
@@ -50,6 +50,12 @@ export async function runRestoreCommand(): Promise<number> {
       env: process.env,
       label: `${app.name} supervisor`,
     });
+
+    await upsertAppState({
+      ...app,
+      supervisorPid,
+    });
+
     console.log(`Restored ${app.name} with supervisor pid ${supervisorPid}.`);
     restored += 1;
   }
