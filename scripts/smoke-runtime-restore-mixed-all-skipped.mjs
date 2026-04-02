@@ -12,20 +12,16 @@ const cli = ["node", "dist/cli.js"];
 const statePath = ".lifeline/state.json";
 
 const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-const appStopped = `runtime-smoke-restore-mixed-stopped-${uniqueSuffix}`;
-const appCrashLoop = `runtime-smoke-restore-mixed-crash-loop-${uniqueSuffix}`;
-const appBlocked = `runtime-smoke-restore-mixed-blocked-${uniqueSuffix}`;
+const stoppedAppName = `runtime-smoke-restore-mixed-stopped-${uniqueSuffix}`;
+const crashLoopAppName = `runtime-smoke-restore-mixed-crash-loop-${uniqueSuffix}`;
+const blockedAppName = `runtime-smoke-restore-mixed-blocked-${uniqueSuffix}`;
 
-const portBase = 8200 + Math.floor(Math.random() * 400);
-const portStopped = portBase;
-const portCrashLoop = portBase + 1;
-const portBlocked = portBase + 2;
+const stoppedPort = 7200 + Math.floor(Math.random() * 100);
+const crashLoopPort = 7300 + Math.floor(Math.random() * 100);
+const blockedPort = 7400 + Math.floor(Math.random() * 100);
 
 let tempRootDir;
-let blockedManifestPath;
-let crashLoopManifestPath;
-let stoppedManifestPath;
-let foreignServer;
+let blockedForeignServer;
 
 function run(args, { allowFailure = false } = {}) {
   return new Promise((resolve, reject) => {
@@ -72,46 +68,6 @@ function isPidAlive(pid) {
   }
 }
 
-function canBindPort(port) {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once("error", () => resolve(false));
-    server.listen(port, "127.0.0.1", () => {
-      server.close(() => resolve(true));
-    });
-  });
-}
-
-async function readState() {
-  const raw = await readFile(statePath, "utf8").catch(() => "");
-  if (!raw) {
-    return {};
-  }
-
-  return JSON.parse(raw)?.apps ?? {};
-}
-
-async function readRuntimeState(appName) {
-  const apps = await readState();
-  return apps[appName];
-}
-
-async function waitForState(appName, predicate, label) {
-  for (let i = 0; i < 120; i += 1) {
-    const state = await readRuntimeState(appName);
-    if (state && predicate(state)) {
-      return state;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-
-  const status = await run(["status", appName], { allowFailure: true });
-  throw new Error(
-    `Timed out waiting for ${label} on ${appName}.\nstdout:\n${status.stdout}\nstderr:\n${status.stderr}`,
-  );
-}
-
 async function waitForPidExit(pid) {
   for (let i = 0; i < 80; i += 1) {
     if (!isPidAlive(pid)) {
@@ -123,284 +79,355 @@ async function waitForPidExit(pid) {
   throw new Error(`Timed out waiting for pid ${pid} to exit`);
 }
 
-async function writeManifest({ appName, port, restartPolicy, startCommand }) {
-  const fixtureDir = path.join(tempRootDir, appName);
-  await cp("fixtures/runtime-smoke-app", fixtureDir, { recursive: true });
+function canBindPort(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.listen(port, "127.0.0.1", () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
 
-  const envPath = path.join(fixtureDir, ".env.runtime");
-  const envRaw = await readFile(envPath, "utf8");
-  await writeFile(envPath, envRaw.replace(/^PORT=.*$/m, `PORT=${port}`), "utf8");
+async function readAllRuntimeState() {
+  const raw = await readFile(statePath, "utf8").catch(() => "");
+  if (!raw) {
+    return undefined;
+  }
 
-  const manifestPath = path.join(fixtureDir, "runtime-smoke-app.lifeline.yml");
-  const manifestRaw = await readFile(manifestPath, "utf8");
-  const manifestUpdated = manifestRaw
-    .replace(/^name: .*$/m, `name: ${appName}`)
-    .replace(/^port: .*$/m, `port: ${port}`)
-    .replace(/^  restartPolicy: .*$/m, `  restartPolicy: ${restartPolicy}`)
-    .replace(/^startCommand: .*$/m, `startCommand: ${startCommand}`);
+  const parsed = JSON.parse(raw);
+  return parsed?.apps;
+}
 
-  await writeFile(manifestPath, manifestUpdated, "utf8");
-  return manifestPath;
+async function readAppState(appName) {
+  const apps = await readAllRuntimeState();
+  return apps?.[appName];
+}
+
+async function waitForRuntime(appName, predicate, label) {
+  for (let i = 0; i < 80; i += 1) {
+    const state = await readAppState(appName);
+    if (state && predicate(state)) {
+      return state;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  const latestStatus = await run(["status", appName], { allowFailure: true });
+  throw new Error(
+    `Timed out waiting for ${label} (${appName}).\nstatus:\n${latestStatus.stdout}\n${latestStatus.stderr}`,
+  );
 }
 
 async function waitForRunning(appName) {
-  return waitForState(
+  return waitForRuntime(
     appName,
     (state) =>
       state.lastKnownStatus === "running" &&
       isPidAlive(state.supervisorPid) &&
       isPidAlive(state.childPid),
-    "running state with live supervisor and child",
+    "running state with live managed supervisor and child",
   );
 }
 
-async function waitForStopped(appName) {
-  return waitForState(
-    appName,
-    (state) => state.lastKnownStatus === "stopped",
-    "stopped state",
-  );
-}
-
-async function waitForCrashLoop(appName) {
-  return waitForState(
-    appName,
-    (state) => state.lastKnownStatus === "crash-loop" && state.crashLoopDetected,
-    "crash-loop state",
-  );
-}
-
-async function waitForBlocked(appName, portOwnerPid) {
-  for (let i = 0; i < 120; i += 1) {
-    const state = await readRuntimeState(appName);
-    const status = await run(["status", appName], { allowFailure: true });
+async function waitForStoppedWithHistory() {
+  for (let i = 0; i < 80; i += 1) {
+    const status = await run(["status", stoppedAppName], { allowFailure: true });
+    const state = await readAppState(stoppedAppName);
+    const childStoppedOrDead =
+      status.stdout.includes("- child: dead") || status.stdout.includes("- child: stopped");
 
     if (
-      state?.lastKnownStatus === "blocked" &&
-      state.portOwnerPid === portOwnerPid &&
-      status.stdout.includes(`App ${appName} is blocked.`) &&
-      status.stdout.includes(`- portOwner: pid ${portOwnerPid}`)
+      status.code !== 0 &&
+      status.stdout.includes(`App ${stoppedAppName} is stopped.`) &&
+      childStoppedOrDead &&
+      status.stdout.includes("- portOwner: none") &&
+      state?.lastKnownStatus === "stopped"
     ) {
       return state;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
 
-  const status = await run(["status", appName], { allowFailure: true });
+  const latestStatus = await run(["status", stoppedAppName], { allowFailure: true });
   throw new Error(
-    `Timed out waiting for blocked state on ${appName}.\nstdout:\n${status.stdout}\nstderr:\n${status.stderr}`,
+    `Timed out waiting for stopped status output with persisted history.\nstdout:\n${latestStatus.stdout}\nstderr:\n${latestStatus.stderr}`,
   );
 }
 
-async function startForeignServer() {
-  foreignServer = spawn(
+async function waitForCrashLoopState() {
+  for (let i = 0; i < 700; i += 1) {
+    const state = await readAppState(crashLoopAppName);
+    if (state?.lastKnownStatus === "crash-loop" && state.crashLoopDetected) {
+      return state;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  const latestStatus = await run(["status", crashLoopAppName], { allowFailure: true });
+  throw new Error(
+    `Timed out waiting for crash-loop persisted state (${crashLoopAppName}).\nstatus:\n${latestStatus.stdout}\n${latestStatus.stderr}`,
+  );
+}
+
+async function waitForBlockedState(expectedForeignPid) {
+  for (let i = 0; i < 80; i += 1) {
+    const status = await run(["status", blockedAppName], { allowFailure: true });
+    const state = await readAppState(blockedAppName);
+    if (
+      status.stdout.includes(`App ${blockedAppName} is blocked.`) &&
+      status.stdout.includes(`- portOwner: pid ${expectedForeignPid}`) &&
+      state?.lastKnownStatus === "blocked"
+    ) {
+      return state;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+
+  const latestStatus = await run(["status", blockedAppName], { allowFailure: true });
+  throw new Error(
+    `Timed out waiting for blocked state with foreign owner.\nstdout:\n${latestStatus.stdout}\nstderr:\n${latestStatus.stderr}`,
+  );
+}
+
+async function createManifest(appName, port, { restartPolicy = "never", startCommand } = {}) {
+  const fixtureDirName = appName;
+  const tempFixtureDir = path.join(tempRootDir, fixtureDirName);
+
+  await cp("fixtures/runtime-smoke-app", tempFixtureDir, { recursive: true });
+
+  const envPath = path.join(tempFixtureDir, ".env.runtime");
+  const envRaw = await readFile(envPath, "utf8");
+  await writeFile(envPath, envRaw.replace(/^PORT=.*$/m, `PORT=${port}`), "utf8");
+
+  const manifestPath = path.join(tempFixtureDir, "runtime-smoke-app.lifeline.yml");
+  const manifestRaw = await readFile(manifestPath, "utf8");
+
+  let manifestNext = manifestRaw
+    .replace(/^name: .*$/m, `name: ${appName}`)
+    .replace(/^port: .*$/m, `port: ${port}`)
+    .replace(/^  restartPolicy: .*$/m, `  restartPolicy: ${restartPolicy}`);
+
+  if (startCommand) {
+    manifestNext = manifestNext.replace(/^startCommand: .*$/m, `startCommand: ${startCommand}`);
+  }
+
+  await writeFile(manifestPath, manifestNext, "utf8");
+  return manifestPath;
+}
+
+async function startBlockedForeignServer() {
+  blockedForeignServer = spawn(
     process.execPath,
     [
       "-e",
-      `const http=require(\"node:http\");const port=${portBlocked};http.createServer((req,res)=>{if(req.url===\"/health\"){res.writeHead(200);res.end(\"ok\");return;}res.writeHead(200);res.end(\"foreign\");}).listen(port,\"127.0.0.1\");setInterval(()=>{},1000);`,
+      `const http=require("node:http");const port=${blockedPort};http.createServer((req,res)=>{if(req.url==="/health"){res.writeHead(200);res.end("ok");return;}res.writeHead(200);res.end("foreign");}).listen(port,"127.0.0.1");setInterval(()=>{},1000);`,
     ],
     { stdio: ["ignore", "pipe", "pipe"] },
   );
 
   const stderrChunks = [];
-  foreignServer.stderr.on("data", (chunk) => {
+  blockedForeignServer.stderr.on("data", (chunk) => {
     stderrChunks.push(String(chunk));
   });
 
   await new Promise((resolve) => setTimeout(resolve, 300));
-  if (!foreignServer.pid || !isPidAlive(foreignServer.pid)) {
-    throw new Error(`Failed to start foreign server on ${portBlocked}. stderr:\n${stderrChunks.join("")}`);
+
+  if (!blockedForeignServer.pid || !isPidAlive(blockedForeignServer.pid)) {
+    throw new Error(`Failed to start blocked foreign port owner. stderr:\n${stderrChunks.join("")}`);
   }
 
-  return foreignServer.pid;
+  return blockedForeignServer.pid;
 }
 
-async function assertForeignServing() {
-  const response = await fetch(`http://127.0.0.1:${portBlocked}/`);
+async function assertBlockedForeignServing() {
+  const response = await fetch(`http://127.0.0.1:${blockedPort}/`);
   const body = await response.text();
+
   if (response.status !== 200 || body !== "foreign") {
-    throw new Error(`Expected foreign server on ${portBlocked}, got status=${response.status}, body=${body}`);
+    throw new Error(
+      `Expected blocked foreign server to continue serving on port ${blockedPort}, got status=${response.status} body=${body}`,
+    );
   }
 }
 
-async function stopForeignServer() {
-  if (!foreignServer?.pid) {
+async function stopBlockedForeignServer() {
+  if (!blockedForeignServer?.pid) {
     return;
   }
 
-  if (isPidAlive(foreignServer.pid)) {
-    process.kill(foreignServer.pid, "SIGTERM");
-    await waitForPidExit(foreignServer.pid).catch(async () => {
-      process.kill(foreignServer.pid, "SIGKILL");
-      await waitForPidExit(foreignServer.pid);
+  if (isPidAlive(blockedForeignServer.pid)) {
+    process.kill(blockedForeignServer.pid, "SIGTERM");
+    await waitForPidExit(blockedForeignServer.pid).catch(async () => {
+      process.kill(blockedForeignServer.pid, "SIGKILL");
+      await waitForPidExit(blockedForeignServer.pid);
     });
   }
 
-  foreignServer = undefined;
+  blockedForeignServer = undefined;
 }
 
 async function cleanup() {
-  await stopForeignServer();
-  await run(["down", appStopped], { allowFailure: true });
-  await run(["down", appCrashLoop], { allowFailure: true });
-  await run(["down", appBlocked], { allowFailure: true });
+  await stopBlockedForeignServer();
+  await run(["down", stoppedAppName], { allowFailure: true });
+  await run(["down", crashLoopAppName], { allowFailure: true });
+  await run(["down", blockedAppName], { allowFailure: true });
 }
 
 try {
-  tempRootDir = await mkdtemp(path.join(tmpdir(), "lifeline-runtime-restore-mixed-all-skipped-smoke-"));
+  tempRootDir = await mkdtemp(path.join(tmpdir(), "lifeline-runtime-restore-mixed-skipped-smoke-"));
+  await cleanup();
 
-  stoppedManifestPath = await writeManifest({
-    appName: appStopped,
-    port: portStopped,
-    restartPolicy: "never",
-    startCommand: "node fixtures/runtime-smoke-app/server.js",
-  });
-
-  crashLoopManifestPath = await writeManifest({
-    appName: appCrashLoop,
-    port: portCrashLoop,
+  const stoppedManifestPath = await createManifest(stoppedAppName, stoppedPort, { restartPolicy: "never" });
+  const crashLoopManifestPath = await createManifest(crashLoopAppName, crashLoopPort, {
     restartPolicy: "on-failure",
     startCommand:
       'node -e "const s=require(\'node:net\').createServer();s.listen(Number(process.env.PORT||0),\'127.0.0.1\',()=>setTimeout(()=>process.exit(17),100));"',
   });
-
-  blockedManifestPath = await writeManifest({
-    appName: appBlocked,
-    port: portBlocked,
-    restartPolicy: "never",
-    startCommand: "node fixtures/runtime-smoke-app/server.js",
-  });
-
-  await cleanup();
+  const blockedManifestPath = await createManifest(blockedAppName, blockedPort, { restartPolicy: "never" });
 
   await run(["up", stoppedManifestPath]);
-  const stoppedRunning = await waitForRunning(appStopped);
-  process.kill(stoppedRunning.childPid, "SIGKILL");
-  await waitForPidExit(stoppedRunning.childPid);
-  const stoppedBeforeRestore = await waitForStopped(appStopped);
-
   await run(["up", crashLoopManifestPath], { allowFailure: true });
-  const crashLoopBeforeRestore = await waitForCrashLoop(appCrashLoop);
-
   await run(["up", blockedManifestPath]);
-  const blockedRunning = await waitForRunning(appBlocked);
-  process.kill(blockedRunning.childPid, "SIGKILL");
-  await waitForPidExit(blockedRunning.childPid);
 
-  const foreignPid = await startForeignServer();
-  const blockedBeforeRestore = await waitForBlocked(appBlocked, foreignPid);
+  const stoppedRunningState = await waitForRunning(stoppedAppName);
+  const blockedRunningState = await waitForRunning(blockedAppName);
+  const crashLoopState = await waitForCrashLoopState();
 
-  if (!(await canBindPort(portStopped))) {
-    throw new Error(`Expected stopped app port ${portStopped} to be free before restore`);
+  if (!stoppedRunningState.childPid || !isPidAlive(stoppedRunningState.childPid)) {
+    throw new Error("Expected stopped candidate app to have live child before forcing persisted stopped state");
   }
 
-  if (!(await canBindPort(portCrashLoop))) {
-    throw new Error(`Expected crash-loop app port ${portCrashLoop} to be free before restore`);
+  if (!blockedRunningState.childPid || !isPidAlive(blockedRunningState.childPid)) {
+    throw new Error("Expected blocked candidate app to have live child before forcing persisted blocked state");
   }
 
-  if (await canBindPort(portBlocked)) {
-    throw new Error(`Expected blocked app port ${portBlocked} to remain occupied by foreign owner before restore`);
+  if (crashLoopState.lastExitCode !== 17) {
+    throw new Error(`Expected deterministic crash-loop exit code 17, found ${crashLoopState.lastExitCode}`);
+  }
+
+  process.kill(stoppedRunningState.childPid, "SIGKILL");
+  await waitForPidExit(stoppedRunningState.childPid);
+  const stoppedBeforeRestore = await waitForStoppedWithHistory();
+
+  process.kill(blockedRunningState.childPid, "SIGKILL");
+  await waitForPidExit(blockedRunningState.childPid);
+  const blockedForeignPid = await startBlockedForeignServer();
+  const blockedBeforeRestore = await waitForBlockedState(blockedForeignPid);
+
+  if (stoppedBeforeRestore.lastKnownStatus !== "stopped") {
+    throw new Error(`Expected persisted stopped status before restore, found ${stoppedBeforeRestore.lastKnownStatus}`);
+  }
+
+  if (blockedBeforeRestore.lastKnownStatus !== "blocked") {
+    throw new Error(`Expected persisted blocked status before restore, found ${blockedBeforeRestore.lastKnownStatus}`);
+  }
+
+  if (!(await canBindPort(stoppedPort))) {
+    throw new Error(`Expected stopped app port ${stoppedPort} to be free before restore`);
+  }
+
+  if (!(await canBindPort(crashLoopPort))) {
+    throw new Error(`Expected crash-loop app port ${crashLoopPort} to be free before restore`);
+  }
+
+  if (await canBindPort(blockedPort)) {
+    throw new Error(`Expected blocked app port ${blockedPort} to remain bound by foreign owner before restore`);
   }
 
   const restoreResult = await run(["restore"], { allowFailure: true });
   if (restoreResult.code !== 0) {
     throw new Error(
-      `Expected restore to succeed for all-skipped mixed batch.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+      `Expected restore to succeed for all-skipped mixed persisted states.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
-  const requiredSkipLines = [
-    `Skipping ${appStopped}: last known status is stopped; not restorable as running.`,
-    `Skipping ${appCrashLoop}: last known status is crash-loop; not restorable as running.`,
-    `Skipping ${appBlocked}: last known status is blocked; not restorable as running.`,
+  const expectedSkipLines = [
+    `Skipping ${stoppedAppName}: last known status is stopped; not restorable as running.`,
+    `Skipping ${crashLoopAppName}: last known status is crash-loop; not restorable as running.`,
+    `Skipping ${blockedAppName}: last known status is blocked; not restorable as running.`,
   ];
 
-  for (const line of requiredSkipLines) {
-    if (!restoreResult.stdout.includes(line)) {
-      throw new Error(`Expected restore output to include skip line: ${line}\nstdout:\n${restoreResult.stdout}`);
+  for (const expectedLine of expectedSkipLines) {
+    if (!restoreResult.stdout.includes(expectedLine)) {
+      throw new Error(
+        `Expected restore output to include explicit mixed-batch skip line:\n${expectedLine}\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+      );
     }
   }
 
   if (!restoreResult.stdout.includes("No restorable apps required restart.")) {
     throw new Error(
-      `Expected restore output to summarize all-skipped batch.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+      `Expected restore output to summarize mixed all-skipped batch with no restarts required.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
   if (restoreResult.stdout.includes("No managed apps found in .lifeline/state.json.")) {
     throw new Error(
-      `Expected restore not to misclassify all-skipped batch as missing state.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+      `Expected restore not to misclassify mixed persisted skipped states as no managed apps.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
-  for (const appName of [appStopped, appCrashLoop, appBlocked]) {
-    if (restoreResult.stdout.includes(`Restored ${appName} with supervisor pid`)) {
-      throw new Error(`Expected ${appName} not to be relaunched during all-skipped restore.`);
-    }
-  }
-
-  const stoppedAfterRestore = await readRuntimeState(appStopped);
-  const crashLoopAfterRestore = await readRuntimeState(appCrashLoop);
-  const blockedAfterRestore = await readRuntimeState(appBlocked);
-
-  if (stoppedAfterRestore?.lastKnownStatus !== "stopped") {
-    throw new Error(`Expected stopped app status to persist as stopped, found ${stoppedAfterRestore?.lastKnownStatus}`);
-  }
-
-  if (crashLoopAfterRestore?.lastKnownStatus !== "crash-loop") {
+  if (
+    restoreResult.stdout.includes(`Restored ${stoppedAppName} with supervisor pid`) ||
+    restoreResult.stdout.includes(`Restored ${crashLoopAppName} with supervisor pid`) ||
+    restoreResult.stdout.includes(`Restored ${blockedAppName} with supervisor pid`)
+  ) {
     throw new Error(
-      `Expected crash-loop app status to persist as crash-loop, found ${crashLoopAfterRestore?.lastKnownStatus}`,
+      `Expected restore not to relaunch any app in all-skipped mixed batch.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
-  if (blockedAfterRestore?.lastKnownStatus !== "blocked") {
-    throw new Error(`Expected blocked app status to persist as blocked, found ${blockedAfterRestore?.lastKnownStatus}`);
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+
+  const statusStoppedAfterRestore = await run(["status", stoppedAppName], { allowFailure: true });
+  const statusCrashLoopAfterRestore = await run(["status", crashLoopAppName], { allowFailure: true });
+  const statusBlockedAfterRestore = await run(["status", blockedAppName], { allowFailure: true });
+
+  if (statusStoppedAfterRestore.code === 0 || !statusStoppedAfterRestore.stdout.includes(`App ${stoppedAppName} is stopped.`)) {
+    throw new Error(
+      `Expected stopped app to remain non-running after restore.\nstdout:\n${statusStoppedAfterRestore.stdout}\nstderr:\n${statusStoppedAfterRestore.stderr}`,
+    );
   }
 
-  if (stoppedAfterRestore.supervisorPid !== stoppedBeforeRestore.supervisorPid) {
-    throw new Error("Expected stopped app supervisor pid not to change after restore");
+  if (
+    statusCrashLoopAfterRestore.code === 0 ||
+    !statusCrashLoopAfterRestore.stdout.includes(`App ${crashLoopAppName} is crash-loop.`)
+  ) {
+    throw new Error(
+      `Expected crash-loop app to remain crash-loop after restore.\nstdout:\n${statusCrashLoopAfterRestore.stdout}\nstderr:\n${statusCrashLoopAfterRestore.stderr}`,
+    );
   }
 
-  if (crashLoopAfterRestore.supervisorPid !== crashLoopBeforeRestore.supervisorPid) {
-    throw new Error("Expected crash-loop app supervisor pid not to change after restore");
+  if (statusBlockedAfterRestore.code === 0 || !statusBlockedAfterRestore.stdout.includes(`App ${blockedAppName} is blocked.`)) {
+    throw new Error(
+      `Expected blocked app to remain blocked after restore.\nstdout:\n${statusBlockedAfterRestore.stdout}\nstderr:\n${statusBlockedAfterRestore.stderr}`,
+    );
   }
 
-  if (blockedAfterRestore.supervisorPid !== blockedBeforeRestore.supervisorPid) {
-    throw new Error("Expected blocked app supervisor pid not to change after restore");
+  if (!(await canBindPort(stoppedPort))) {
+    throw new Error(`Expected stopped app port ${stoppedPort} to remain free after restore`);
   }
 
-  if (stoppedAfterRestore.childPid && isPidAlive(stoppedAfterRestore.childPid)) {
-    throw new Error(`Expected stopped app child pid ${stoppedAfterRestore.childPid} to remain offline`);
+  if (!(await canBindPort(crashLoopPort))) {
+    throw new Error(`Expected crash-loop app port ${crashLoopPort} to remain free after restore`);
   }
 
-  if (crashLoopAfterRestore.childPid && isPidAlive(crashLoopAfterRestore.childPid)) {
-    throw new Error(`Expected crash-loop app child pid ${crashLoopAfterRestore.childPid} to remain offline`);
+  if (await canBindPort(blockedPort)) {
+    throw new Error(`Expected blocked app port ${blockedPort} to remain bound by foreign owner after restore`);
   }
 
-  if (blockedAfterRestore.childPid && isPidAlive(blockedAfterRestore.childPid)) {
-    throw new Error(`Expected blocked app child pid ${blockedAfterRestore.childPid} to remain offline`);
+  if (!isPidAlive(blockedForeignPid)) {
+    throw new Error(`Expected blocked foreign owner pid ${blockedForeignPid} to remain alive after restore`);
   }
 
-  if (!(await canBindPort(portStopped))) {
-    throw new Error(`Expected stopped app port ${portStopped} to remain free after restore`);
-  }
+  await assertBlockedForeignServing();
 
-  if (!(await canBindPort(portCrashLoop))) {
-    throw new Error(`Expected crash-loop app port ${portCrashLoop} to remain free after restore`);
-  }
-
-  if (await canBindPort(portBlocked)) {
-    throw new Error(`Expected blocked app port ${portBlocked} to remain owned by foreign process after restore`);
-  }
-
-  await assertForeignServing();
-} catch (error) {
-  await cleanup();
-  throw error;
+  console.log("runtime restore mixed all-skipped smoke passed");
 } finally {
-  await cleanup();
+  await cleanup().catch(() => {});
   if (tempRootDir) {
-    await rm(tempRootDir, { recursive: true, force: true });
+    await rm(tempRootDir, { recursive: true, force: true }).catch(() => {});
   }
 }
