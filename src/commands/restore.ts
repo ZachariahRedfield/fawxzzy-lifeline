@@ -17,7 +17,8 @@ export async function runRestoreCommand(): Promise<number> {
   let failures = 0;
   for (const app of apps) {
     if (!app.restorable) {
-      console.log(`Skipping ${app.name}: app is marked restorable=false.`);
+      const reason = "app is marked restorable=false.";
+      console.log(`Skipping ${app.name}: ${reason}`);
       continue;
     }
 

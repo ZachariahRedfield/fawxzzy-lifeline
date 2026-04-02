@@ -135,6 +135,16 @@ try {
     );
   }
 
+  if (restoreResult.stdout.includes(`Restored ${appName} with supervisor pid`)) {
+    throw new Error(
+      `Expected non-restorable app not to be relaunched.
+stdout:
+${restoreResult.stdout}
+stderr:
+${restoreResult.stderr}`,
+    );
+  }
+
   console.log("Restore non-restorable skip message deterministic verification passed.");
 } finally {
   process.chdir(originalCwd);
