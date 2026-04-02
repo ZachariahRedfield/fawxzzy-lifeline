@@ -187,6 +187,7 @@ export async function runSupervisor(appName: string): Promise<number> {
         ...state,
         childPid: undefined,
         wrapperPid: undefined,
+        listenerPid: undefined,
         portOwnerPid: await findListeningPortOwnerPid(state.port),
         lastKnownStatus: "blocked",
         blockedReason: restartPortReady.blockedReason,
