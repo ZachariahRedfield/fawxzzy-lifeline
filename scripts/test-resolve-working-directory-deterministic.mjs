@@ -6,6 +6,10 @@ import { pathToFileURL } from "node:url";
 
 import typescript from "typescript";
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 async function transpileCoreModule(tempRoot, relativePath) {
   const sourcePath = path.join("src", "core", relativePath);
   const source = await readFile(sourcePath, "utf8");
@@ -30,6 +34,7 @@ async function loadResolverFromSource() {
   const transpileRoot = await mkdtemp(
     path.join(os.tmpdir(), "lifeline-resolve-workdir-transpile-"),
   );
+
   try {
     await Promise.all([
       transpileCoreModule(transpileRoot, "errors.ts"),
@@ -40,9 +45,9 @@ async function loadResolverFromSource() {
       path.join(transpileRoot, "core", "resolve-working-directory.js"),
     ).href;
     const module = await import(moduleUrl);
+
     return {
       resolveWorkingDirectory: module.resolveWorkingDirectory,
-      ValidationError: module.ValidationError,
       transpileRoot,
     };
   } catch (error) {
@@ -104,6 +109,11 @@ try {
     resolvedTargetDir,
     "Expected relative working directory resolution to be anchored to manifest directory.",
   );
+  assert.notEqual(
+    relativeResolved,
+    path.join(unrelatedCwd, "app"),
+    "Expected resolution to ignore caller cwd and use manifest directory.",
+  );
 
   const absoluteResolved = await resolveWorkingDirectory(
     manifestPath,
@@ -126,7 +136,7 @@ try {
     [
       /missing deploy\.workingDirectory/i,
       /required for runtime commands/i,
-      new RegExp(manifestPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      new RegExp(escapeRegExp(manifestPath)),
     ],
   );
 
@@ -141,8 +151,8 @@ try {
       ),
     [
       /Working directory for app deterministic-app does not exist:/,
-      new RegExp(missingDirPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
-      new RegExp(`\\(from ${manifestPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\)\\.`),
+      new RegExp(escapeRegExp(missingDirPath)),
+      new RegExp(`\\(from ${escapeRegExp(manifestPath)}\\)\\.`),
     ],
   );
 
