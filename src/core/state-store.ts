@@ -133,7 +133,26 @@ export async function readState(): Promise<RuntimeStateFile> {
 
 export async function writeState(state: RuntimeStateFile): Promise<void> {
   await ensureStateDirectory();
-  await writeFile(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+
+  const serializedState = `${JSON.stringify(state, null, 2)}\n`;
+  const tempPath = path.join(
+    LIFELINE_DIR,
+    `state.json.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  );
+
+  await writeFile(tempPath, serializedState, "utf8");
+
+  const fsPromises = (await import("node:fs/promises")) as unknown as {
+    rename(oldPath: string, newPath: string): Promise<void>;
+    unlink(path: string): Promise<void>;
+  };
+
+  try {
+    await fsPromises.rename(tempPath, STATE_PATH);
+  } catch (error) {
+    await fsPromises.unlink(tempPath).catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function getAppState(
