@@ -34,6 +34,7 @@ async function expectExpectedError(
   callback,
   expectedCtor,
   expectedMessageFragment,
+  expectedCode,
 ) {
   try {
     await callback();
@@ -46,6 +47,12 @@ async function expectExpectedError(
       error.message.includes(expectedMessageFragment),
       `${name}: expected error message to include "${expectedMessageFragment}", received:\n${error.message}`,
     );
+    if (expectedCode) {
+      assert(
+        error.code === expectedCode,
+        `${name}: expected error code ${expectedCode}, received ${error.code}`,
+      );
+    }
     return;
   }
 
@@ -90,12 +97,13 @@ try {
     () => loadPlaybookArchetypeDefaults(missingArchetypePlaybook, "node-web"),
     ValidationError,
     "Playbook archetype export is missing for node-web",
+    "VALIDATION_ERROR",
   );
 
   const nonObjectYamlPlaybook = await makePlaybook(tempRoot, "non-object-yaml");
   await writeFile(
     path.join(nonObjectYamlPlaybook, "exports", "lifeline", "archetypes", "node-web.yml"),
-    "- just\n- a\n- list\n",
+    "node-web\n",
     "utf8",
   );
 
@@ -103,7 +111,8 @@ try {
     "non-object archetype yaml",
     () => loadPlaybookArchetypeDefaults(nonObjectYamlPlaybook, "node-web"),
     ManifestLoadError,
-    "List item without list parent",
+    "Expected key/value pair near line 1",
+    "MANIFEST_LOAD_ERROR",
   );
 
   const invalidShapePlaybook = await makePlaybook(tempRoot, "invalid-shape");
@@ -118,6 +127,7 @@ try {
     () => loadPlaybookArchetypeDefaults(invalidShapePlaybook, "node-web"),
     ValidationError,
     "Playbook export shape is invalid",
+    "VALIDATION_ERROR",
   );
 
   console.log("loadPlaybookArchetypeDefaults deterministic verification passed.");

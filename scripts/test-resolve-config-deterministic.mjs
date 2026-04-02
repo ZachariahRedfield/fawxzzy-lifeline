@@ -179,6 +179,41 @@ try {
     "Resolved config is incomplete or invalid",
   );
 
+  const noPlaybookManifestPath = path.join(tempRoot, "no-playbook.yml");
+  await writeFile(
+    noPlaybookManifestPath,
+    [
+      "name: no-playbook",
+      "archetype: node-web",
+      "repo: https://example.com/repo.git",
+      "branch: main",
+      "installCommand: pnpm install",
+      "buildCommand: pnpm build",
+      "startCommand: pnpm start",
+      "port: 3000",
+      "healthcheckPath: /healthz",
+      "env:",
+      "  mode: inline",
+      "  requiredKeys:",
+      "    - ONLY_MANIFEST",
+      "deploy:",
+      "  strategy: restart",
+    ].join("\n"),
+    "utf8",
+  );
+
+  const noPlaybookResult = await resolveManifestConfig({
+    manifestPath: noPlaybookManifestPath,
+  });
+  assert(
+    noPlaybookResult.usedPlaybookDefaults === false,
+    "expected usedPlaybookDefaults=false when no playbook path is provided",
+  );
+  assert(
+    noPlaybookResult.playbookPath === undefined,
+    `expected playbookPath to be undefined without playbook path, received ${noPlaybookResult.playbookPath}`,
+  );
+
   const fixturePlaybookPath = path.join(tempRoot, "fixture-playbook");
   await cp("fixtures/playbook-export", fixturePlaybookPath, { recursive: true });
 
