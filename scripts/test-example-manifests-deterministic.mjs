@@ -24,16 +24,18 @@ function runValidate(manifestPath, cwd = repoRoot) {
 
   return {
     status: result.status ?? 1,
-    stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
+    output: `${result.stdout ?? ""}${result.stderr ?? ""}`,
   };
 }
 
 function assertValidateSuccess(result, label) {
-  assert(
-    result.status === 0,
-    `${label} validate failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
-  );
+  assert(result.status === 0, `${label} validate failed:\n${result.output}`);
+}
+
+function assertAll(output, checks) {
+  for (const check of checks) {
+    assert(output.includes(check), `Missing expected output marker \"${check}\".\n${output}`);
+  }
 }
 
 const fitnessRelativePath = "examples/fitness-app.lifeline.yml";
@@ -45,25 +47,14 @@ const fitnessAbsolute = runValidate(fitnessAbsolutePath, externalCwd);
 assertValidateSuccess(fitnessRelative, "fitness relative path");
 assertValidateSuccess(fitnessAbsolute, "fitness absolute path");
 
-const fitnessRelativeOutput = `${fitnessRelative.stdout}${fitnessRelative.stderr}`;
-const fitnessAbsoluteOutput = `${fitnessAbsolute.stdout}${fitnessAbsolute.stderr}`;
-
-assert(
-  fitnessRelativeOutput.includes("Fitness mirror manifest is valid"),
-  `Expected fitness relative validate to use mirror path.\n${fitnessRelativeOutput}`,
-);
-assert(
-  fitnessAbsoluteOutput.includes("Fitness mirror manifest is valid"),
-  `Expected fitness absolute validate to use mirror path.\n${fitnessAbsoluteOutput}`,
-);
-assert(
-  fitnessRelativeOutput.includes("- boundary: fitness manifest mirror"),
-  `Expected fitness relative validate boundary marker.\n${fitnessRelativeOutput}`,
-);
-assert(
-  fitnessAbsoluteOutput.includes("- boundary: fitness manifest mirror"),
-  `Expected fitness absolute validate boundary marker.\n${fitnessAbsoluteOutput}`,
-);
+assertAll(fitnessRelative.output, [
+  "Fitness mirror manifest is valid",
+  "- boundary: fitness manifest mirror",
+]);
+assertAll(fitnessAbsolute.output, [
+  "Fitness mirror manifest is valid",
+  "- boundary: fitness manifest mirror",
+]);
 
 const playbookRelativePath = "examples/playbook-ui.lifeline.yml";
 const playbookAbsolutePath = resolve(repoRoot, playbookRelativePath);
@@ -74,17 +65,13 @@ const playbookAbsolute = runValidate(playbookAbsolutePath, externalCwd);
 assertValidateSuccess(playbookRelative, "playbook-ui relative path");
 assertValidateSuccess(playbookAbsolute, "playbook-ui absolute path");
 
-const playbookRelativeOutput = `${playbookRelative.stdout}${playbookRelative.stderr}`;
-const playbookAbsoluteOutput = `${playbookAbsolute.stdout}${playbookAbsolute.stderr}`;
-
-for (const output of [playbookRelativeOutput, playbookAbsoluteOutput]) {
-  assert(
-    output.includes("Manifest is valid:"),
-    `Expected playbook example validate success banner.\n${output}`,
-  );
-  assert(output.includes("- app: playbook-ui"), `Missing app output for playbook example.\n${output}`);
-  assert(output.includes("- archetype: next-web"), `Missing archetype output for playbook example.\n${output}`);
-  assert(output.includes("- port: 3100"), `Missing port output for playbook example.\n${output}`);
+for (const output of [playbookRelative.output, playbookAbsolute.output]) {
+  assertAll(output, [
+    "Manifest is valid:",
+    "- app: playbook-ui",
+    "- archetype: next-web",
+    "- port: 3100",
+  ]);
 }
 
 console.log("Example manifest deterministic verification passed.");
