@@ -129,11 +129,8 @@ try {
   clearTimeout(delayedStartTimer);
   assert.deepEqual(eventualSuccessResult, { ok: true, status: 200 });
 
-  const timeoutPort = await reservePortThenRelease();
-  const timeoutResult = await waitForHealth(timeoutPort, "/health", 50);
-  assert.equal(timeoutResult.ok, false);
-  assert.equal(typeof timeoutResult.error, "string");
-  assert.match(timeoutResult.error, /fetch failed|ECONNREFUSED/i);
+  const timeoutResult = await waitForHealth(getPort(alwaysUnhealthyServer), "/health", 100);
+  assert.deepEqual(timeoutResult, { ok: false, status: 503, error: "HTTP 503" });
 
   console.log("healthcheck deterministic verification passed.");
 } finally {
