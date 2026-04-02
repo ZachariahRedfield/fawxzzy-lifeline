@@ -70,7 +70,8 @@
     "smoke:runtime:restart-invalid-manifest-shape": "node scripts/smoke-runtime-restart-invalid-manifest-shape.mjs",
     "smoke:runtime:restore-malformed-manifest": "node scripts/smoke-runtime-restore-malformed-manifest.mjs",
     "smoke:runtime:up-invalid-manifest-shape": "node scripts/smoke-runtime-up-invalid-manifest-shape.mjs",
-    "smoke:runtime:restore-invalid-manifest-shape": "node scripts/smoke-runtime-restore-invalid-manifest-shape.mjs"
+    "smoke:runtime:restore-invalid-manifest-shape": "node scripts/smoke-runtime-restore-invalid-manifest-shape.mjs",
+    "smoke:runtime:up-invalid-playbook-export": "node scripts/smoke-runtime-up-invalid-playbook-export.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
