@@ -194,6 +194,13 @@ try {
     );
   }
 
+  const expectedSkipMessage = `Skipping ${appName}: restorable: false (explicitly excluded from restore).`;
+  if (!restoreResult.stdout.includes(expectedSkipMessage)) {
+    throw new Error(
+      `Expected restore output to include explicit non-restorable skip message.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+    );
+  }
+
   if (!restoreResult.stdout.includes("No restorable apps required restart.")) {
     throw new Error(
       `Expected restore output to converge to no restorable apps restart message.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
