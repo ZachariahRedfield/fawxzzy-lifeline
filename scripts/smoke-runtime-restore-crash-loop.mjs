@@ -139,6 +139,7 @@ try {
   }
 
   const restartCountBeforeRestore = crashLoopState.restartCount;
+  const supervisorPidBeforeRestore = crashLoopState.supervisorPid;
 
   if (crashLoopState.childPid && isPidAlive(crashLoopState.childPid)) {
     throw new Error(`Expected no live child process before restore, found ${crashLoopState.childPid}`);
@@ -162,6 +163,19 @@ try {
   ) {
     throw new Error(
       `Expected restore output to explicitly skip crash-loop app.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+    );
+  }
+
+
+  if (!restoreResult.stdout.includes("No restorable apps required restart.")) {
+    throw new Error(
+      `Expected restore output to report no eligible restarts after crash-loop skip.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+    );
+  }
+
+  if (restoreResult.stdout.includes(`Restored ${appName} with supervisor pid`)) {
+    throw new Error(
+      `Expected crash-loop app not to be restored/relaunched.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
     );
   }
 
@@ -210,6 +224,18 @@ try {
   if (stateAfterRestore.lastKnownStatus !== "crash-loop") {
     throw new Error(
       `Expected persisted status to remain crash-loop after restore, found ${stateAfterRestore.lastKnownStatus}`,
+    );
+  }
+
+  if (stateAfterRestore.supervisorPid !== supervisorPidBeforeRestore) {
+    throw new Error(
+      `Expected restore to avoid launching a new supervisor for crash-loop app; supervisor pid changed from ${supervisorPidBeforeRestore} to ${stateAfterRestore.supervisorPid}`,
+    );
+  }
+
+  if (stateAfterRestore.supervisorPid && isPidAlive(stateAfterRestore.supervisorPid)) {
+    throw new Error(
+      `Expected no live supervisor after restore skip, found ${stateAfterRestore.supervisorPid}`,
     );
   }
 
