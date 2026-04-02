@@ -8,13 +8,29 @@ import { ManifestLoadError, ValidationError } from "../core/errors.js";
 import { loadManifestFile } from "../core/load-manifest.js";
 import { resolveManifestConfig } from "../core/resolve-config.js";
 
-const FITNESS_MIRROR_MANIFEST_PATH = "examples/fitness-app.lifeline.yml";
+function filePathFromImportMetaUrl(moduleUrl: string): string {
+  const pathname = decodeURIComponent(new URL(moduleUrl).pathname);
+
+  if (process.platform === "win32" && /^\/[A-Za-z]:/.test(pathname)) {
+    return pathname.slice(1);
+  }
+
+  return pathname;
+}
+
+const CLI_ROOT_PATH = path.resolve(
+  path.dirname(filePathFromImportMetaUrl(import.meta.url)),
+  "../..",
+);
 const FITNESS_MIRROR_MANIFEST_ABSOLUTE_PATH = path.resolve(
-  FITNESS_MIRROR_MANIFEST_PATH,
+  CLI_ROOT_PATH,
+  "examples/fitness-app.lifeline.yml",
 );
 
 function isFitnessMirrorManifestPath(manifestPath: string): boolean {
-  return path.resolve(manifestPath) === FITNESS_MIRROR_MANIFEST_ABSOLUTE_PATH;
+  return (
+    path.resolve(manifestPath) === FITNESS_MIRROR_MANIFEST_ABSOLUTE_PATH
+  );
 }
 
 export async function runValidateCommand(

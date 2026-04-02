@@ -1,3 +1,5 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -7,9 +9,9 @@ function assert(condition, message) {
   }
 }
 
-function runValidate(manifestPath) {
-  return spawnSync('node', ['dist/cli.js', 'validate', manifestPath], {
-    cwd: process.cwd(),
+function runValidate(cliPath, manifestPath, cwd) {
+  return spawnSync('node', [cliPath, 'validate', manifestPath], {
+    cwd,
     encoding: 'utf8',
   });
 }
@@ -18,17 +20,21 @@ function normalizeOutput(output, manifestPath) {
   return output.replaceAll(manifestPath, '<manifest-path>');
 }
 
+const repoRoot = process.cwd();
 const build = spawnSync('pnpm', ['build'], {
-  cwd: process.cwd(),
+  cwd: repoRoot,
   encoding: 'utf8',
 });
 assert(build.status === 0, `build failed:\n${build.stdout}\n${build.stderr}`);
 
 const relativePath = 'examples/fitness-app.lifeline.yml';
-const absolutePath = resolve(relativePath);
+const absolutePath = resolve(repoRoot, relativePath);
+const externalCwd = mkdtempSync(resolve(tmpdir(), 'lifeline-validate-path-parity-'));
 
-const relativeResult = runValidate(relativePath);
-const absoluteResult = runValidate(absolutePath);
+const cliPath = resolve(repoRoot, 'dist/cli.js');
+
+const relativeResult = runValidate(cliPath, relativePath, repoRoot);
+const absoluteResult = runValidate(cliPath, absolutePath, externalCwd);
 
 assert(relativeResult.status === 0, `relative validation failed:\n${relativeResult.stdout}\n${relativeResult.stderr}`);
 assert(absoluteResult.status === 0, `absolute validation failed:\n${absoluteResult.stdout}\n${absoluteResult.stderr}`);
