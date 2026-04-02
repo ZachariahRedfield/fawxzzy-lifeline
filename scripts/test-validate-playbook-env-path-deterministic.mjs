@@ -1,129 +1,115 @@
-import { access } from 'node:fs/promises';
-import { execFile } from 'node:child_process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
+import { spawn } from "node:child_process";
+import path from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
 
-const execFileAsync = promisify(execFile);
+import { ensureBuilt } from "./lib/ensure-built.mjs";
 
-function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
+await ensureBuilt();
 
-function normalizeOutput(text) {
-  return text.replace(/\r\n/g, '\n');
-}
+const cliPath = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
+const manifestPath = fileURLToPath(
+  new URL("../fixtures/runtime-smoke-app/runtime-smoke-app.playbook.lifeline.yml", import.meta.url),
+);
+const playbookPath = "fixtures/playbook-export";
+const expectedResolvedPlaybookPath = path.resolve(playbookPath).replace(/\\/g, "/");
 
-async function ensureBuiltCli(repoRoot) {
-  const cliPath = path.join(repoRoot, 'dist', 'cli.js');
-  try {
-    await access(cliPath);
-  } catch {
-    await execFileAsync('pnpm', ['build'], {
-      cwd: repoRoot,
-      env: process.env,
+function runValidate(args, env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("node", [cliPath, "validate", manifestPath, ...args], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env,
     });
-  }
-  return cliPath;
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      resolve({
+        code: code ?? 1,
+        stdout: stdout.replace(/\r\n/g, "\n"),
+        stderr: stderr.replace(/\r\n/g, "\n"),
+      });
+    });
+  });
 }
 
-async function runValidate(cliPath, repoRoot, envOverrides = {}, extraArgs = []) {
-  const manifestPath = 'fixtures/runtime-smoke-app/runtime-smoke-app.playbook.lifeline.yml';
-
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      process.execPath,
-      [cliPath, 'validate', manifestPath, ...extraArgs],
-      {
-        cwd: repoRoot,
-        env: {
-          ...process.env,
-          ...envOverrides,
-        },
-      },
-    );
-    return { code: 0, stdout: normalizeOutput(stdout), stderr: normalizeOutput(stderr) };
-  } catch (error) {
-    const exitError = /** @type {{ code?: number; stdout?: string; stderr?: string }} */ (error);
-    return {
-      code: typeof exitError.code === 'number' ? exitError.code : 1,
-      stdout: normalizeOutput(exitError.stdout ?? ''),
-      stderr: normalizeOutput(exitError.stderr ?? ''),
-    };
-  }
-}
-
-function pickSemanticLines(stdout) {
+function semanticLines(stdout) {
   return stdout
-    .split('\n')
+    .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
     .filter(
       (line) =>
-        line.startsWith('Resolved manifest is valid:') ||
-        line.startsWith('- app:') ||
-        line.startsWith('- archetype:') ||
-        line.startsWith('- port:') ||
-        line.startsWith('- playbook:'),
+        line.startsWith("Resolved manifest is valid:") ||
+        line.startsWith("- app:") ||
+        line.startsWith("- archetype:") ||
+        line.startsWith("- port:") ||
+        line.startsWith("- playbook:"),
     );
 }
 
-async function main() {
-  const repoRoot = fileURLToPath(new URL('..', import.meta.url));
-  const cliPath = await ensureBuiltCli(repoRoot);
+const explicitResult = await runValidate(
+  ["--playbook-path", playbookPath],
+  process.env,
+);
 
-  const playbookPath = 'fixtures/playbook-export';
-  const expectedPlaybookAbs = path.resolve(repoRoot, playbookPath).replace(/\\/g, '/');
-
-  const explicit = await runValidate(cliPath, repoRoot, {}, ['--playbook-path', playbookPath]);
-  assert(explicit.code === 0, `Expected explicit --playbook-path validate to succeed, got ${explicit.code}.`);
-  assert(
-    explicit.stdout.includes('Resolved manifest is valid'),
-    `Expected explicit --playbook-path output to include validation banner, got:\n${explicit.stdout}\n${explicit.stderr}`,
+if (explicitResult.code !== 0) {
+  throw new Error(
+    `Expected explicit --playbook-path validate to succeed, got ${explicitResult.code}.\nstdout:\n${explicitResult.stdout}\nstderr:\n${explicitResult.stderr}`,
   );
-
-  const envVar = await runValidate(cliPath, repoRoot, {
-    LIFELINE_PLAYBOOK_PATH: playbookPath,
-  });
-  assert(envVar.code === 0, `Expected env-var validate to succeed, got ${envVar.code}.`);
-  assert(
-    envVar.stdout.includes('Resolved manifest is valid'),
-    `Expected env-var output to include validation banner, got:\n${envVar.stdout}\n${envVar.stderr}`,
-  );
-
-  const explicitPlaybookLine = pickSemanticLines(explicit.stdout).find((line) => line.startsWith('- playbook:'));
-  const envPlaybookLine = pickSemanticLines(envVar.stdout).find((line) => line.startsWith('- playbook:'));
-
-  assert(explicitPlaybookLine, `Expected explicit output to include resolved playbook line, got:\n${explicit.stdout}`);
-  assert(envPlaybookLine, `Expected env-var output to include resolved playbook line, got:\n${envVar.stdout}`);
-  assert(
-    explicitPlaybookLine.includes(expectedPlaybookAbs),
-    `Expected explicit playbook line to include resolved absolute path ${expectedPlaybookAbs}, got: ${explicitPlaybookLine}`,
-  );
-  assert(
-    envPlaybookLine.includes(expectedPlaybookAbs),
-    `Expected env-var playbook line to include resolved absolute path ${expectedPlaybookAbs}, got: ${envPlaybookLine}`,
-  );
-
-  const explicitSemantics = pickSemanticLines(explicit.stdout);
-  const envSemantics = pickSemanticLines(envVar.stdout);
-
-  assert(
-    JSON.stringify(explicitSemantics) === JSON.stringify(envSemantics),
-    [
-      'Expected env-var and explicit --playbook-path validation semantics to match.',
-      `explicit: ${JSON.stringify(explicitSemantics, null, 2)}`,
-      `env-var: ${JSON.stringify(envSemantics, null, 2)}`,
-    ].join('\n'),
-  );
-
-  console.log('Deterministic validate playbook env-path verification passed.');
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`Deterministic validate playbook env-path verification failed: ${message}`);
-  process.exitCode = 1;
+const envResult = await runValidate([], {
+  ...process.env,
+  LIFELINE_PLAYBOOK_PATH: playbookPath,
 });
+
+if (envResult.code !== 0) {
+  throw new Error(
+    `Expected env-var validate to succeed, got ${envResult.code}.\nstdout:\n${envResult.stdout}\nstderr:\n${envResult.stderr}`,
+  );
+}
+
+if (!envResult.stdout.includes("Resolved manifest is valid")) {
+  throw new Error(
+    `Expected env-var validate output to include success banner.\nstdout:\n${envResult.stdout}\nstderr:\n${envResult.stderr}`,
+  );
+}
+
+const envPlaybookLine = semanticLines(envResult.stdout).find((line) => line.startsWith("- playbook:"));
+if (!envPlaybookLine) {
+  throw new Error(
+    `Expected env-var validate output to include resolved playbook line.\nstdout:\n${envResult.stdout}\nstderr:\n${envResult.stderr}`,
+  );
+}
+
+if (!envPlaybookLine.includes(expectedResolvedPlaybookPath)) {
+  throw new Error(
+    `Expected env-var validate output to include resolved playbook path ${expectedResolvedPlaybookPath}, got: ${envPlaybookLine}`,
+  );
+}
+
+const explicitSemantic = semanticLines(explicitResult.stdout);
+const envSemantic = semanticLines(envResult.stdout);
+
+if (JSON.stringify(explicitSemantic) !== JSON.stringify(envSemantic)) {
+  throw new Error(
+    [
+      "Expected env-var and explicit --playbook-path validate semantics to match.",
+      `explicit: ${JSON.stringify(explicitSemantic, null, 2)}`,
+      `env-var: ${JSON.stringify(envSemantic, null, 2)}`,
+    ].join("\n"),
+  );
+}
+
+console.log("Validate playbook env-path deterministic verification passed.");
