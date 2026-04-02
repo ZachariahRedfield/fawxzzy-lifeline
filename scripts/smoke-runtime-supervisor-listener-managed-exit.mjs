@@ -136,7 +136,8 @@ async function waitForStoppedAfterListenerExit() {
     (state) =>
       state.lastKnownStatus === "stopped" &&
       !state.childPid &&
-      !state.listenerPid,
+      !state.listenerPid &&
+      !state.wrapperPid,
     "stopped state after listener-managed exit",
   );
 }
@@ -249,21 +250,19 @@ try {
     throw new Error("Expected listener-managed running state with a live supervisor pid");
   }
 
-  process.kill(listenerManagedState.supervisorPid, "SIGTERM");
-
-  await waitForLogsToContain(
-    "managed child exited via listener (signal SIGTERM)",
-    "listener managed-exit source log",
-  );
-
   if (listenerManagedState.listenerPid && isPidAlive(listenerManagedState.listenerPid)) {
     process.kill(listenerManagedState.listenerPid, "SIGTERM");
   }
 
+  await waitForLogsToContain(
+    "managed child exited via listener (code 1)",
+    "listener managed-exit source log",
+  );
+
   const stoppedState = await waitForStoppedAfterListenerExit();
 
-  if (stoppedState.lastExitCode !== 0) {
-    throw new Error(`Expected listener-managed supervisor-stop exit to record lastExitCode=0, found ${stoppedState.lastExitCode}`);
+  if (stoppedState.lastExitCode !== 1) {
+    throw new Error(`Expected listener-managed listener-exit path to record lastExitCode=1, found ${stoppedState.lastExitCode}`);
   }
 
   if (stoppedState.restartCount !== 0) {
