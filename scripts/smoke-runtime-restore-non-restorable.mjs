@@ -253,6 +253,24 @@ try {
   }
 
   const statusAfterRestore = await run(["status", appName], { allowFailure: true });
+  if (statusAfterRestore.code === 0) {
+    throw new Error(
+      `Expected non-restorable app to remain stopped after restore skip.\nstdout:\n${statusAfterRestore.stdout}\nstderr:\n${statusAfterRestore.stderr}`,
+    );
+  }
+
+  if (!statusAfterRestore.stdout.includes(`App ${appName} is stopped.`)) {
+    throw new Error(
+      `Expected stopped status output to confirm no relaunch after restore skip.\nstdout:\n${statusAfterRestore.stdout}\nstderr:\n${statusAfterRestore.stderr}`,
+    );
+  }
+
+  if (!statusAfterRestore.stdout.includes("- portOwner: none")) {
+    throw new Error(
+      `Expected stopped status to report free port ownership after restore skip.\nstdout:\n${statusAfterRestore.stdout}\nstderr:\n${statusAfterRestore.stderr}`,
+    );
+  }
+
   if (statusAfterRestore.stdout.includes("No runtime state found")) {
     throw new Error(
       `Expected status not to report no-history confusion after non-restorable restore skip.\nstdout:\n${statusAfterRestore.stdout}\nstderr:\n${statusAfterRestore.stderr}`,
