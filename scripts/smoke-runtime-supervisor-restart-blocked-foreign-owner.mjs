@@ -232,10 +232,8 @@ try {
 
   await triggerDeterministicCrash();
   await waitForPidExit(initialManagedPid);
-
-  await waitForRestartCount(1);
-
   const foreignPid = await startForeignServer();
+  await waitForRestartCount(1);
   const blockedState = await waitForBlockedState(foreignPid);
 
   if (blockedState.lastKnownStatus !== "blocked") {
