@@ -49,7 +49,18 @@ async function readStartupState(): Promise<StartupState> {
     return defaultState();
   }
 
-  const parsed = JSON.parse(raw) as Partial<StartupState>;
+  let parsed: Partial<StartupState>;
+  try {
+    parsed = JSON.parse(raw) as Partial<StartupState>;
+  } catch {
+    return defaultState();
+  }
+
+  const updatedAt =
+    typeof parsed.updatedAt === "string" && !Number.isNaN(Date.parse(parsed.updatedAt))
+      ? parsed.updatedAt
+      : new Date().toISOString();
+
   return {
     ...defaultState(),
     ...parsed,
@@ -58,8 +69,7 @@ async function readStartupState(): Promise<StartupState> {
     restoreEntrypoint: "lifeline restore",
     backendStatus: "not-installed",
     intent: parsed.intent === "enabled" ? "enabled" : "disabled",
-    updatedAt:
-      typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
+    updatedAt,
   };
 }
 

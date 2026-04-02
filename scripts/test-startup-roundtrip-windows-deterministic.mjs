@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,6 +60,14 @@ async function main() {
 
   const disabledState = await readStartupState(tempDir);
   assert(disabledState.intent === 'disabled', `Expected disabled intent, got ${disabledState.intent}`);
+
+  const statePath = path.join(tempDir, '.lifeline', 'startup.json');
+  await writeFile(statePath, '{"intent":', 'utf8');
+  const recoveredStatusOutput = await runLifeline(tempDir, 'startup', 'status');
+  assert(
+    recoveredStatusOutput.includes('Startup enabled: no'),
+    'Expected startup status to recover from malformed startup state as disabled.',
+  );
 
   console.log('Deterministic startup roundtrip verification passed (enable/status/disable).');
 }
