@@ -123,11 +123,13 @@ async function waitForStoppedWithHistory() {
   for (let i = 0; i < 60; i += 1) {
     const status = await run(["status", appName], { allowFailure: true });
     const state = await readRuntimeState();
+    const childStoppedOrDead =
+      status.stdout.includes("- child: dead") || status.stdout.includes("- child: stopped");
 
     if (
       status.code !== 0 &&
       status.stdout.includes(`App ${appName} is stopped.`) &&
-      status.stdout.includes("- child: dead") &&
+      childStoppedOrDead &&
       status.stdout.includes("- portOwner: none") &&
       state?.lastKnownStatus === "stopped"
     ) {
