@@ -186,6 +186,15 @@ pnpm test:startup-roundtrip
 
 CI uses the same canonical Playbook verification path: `pnpm smoke:playbook`.
 
+For targeted runtime smoke scenarios, prefer the deterministic smoke runner instead of adding new `package.json` script keys:
+
+```bash
+pnpm smoke:run runtime restore-invalid-manifest-shape
+pnpm smoke:run runtime restart-invalid-playbook-export
+```
+
+The runner resolves files by `scripts/smoke-<mode>-<scenario>.mjs` naming convention. New runtime smoke coverage should usually be added as a new `scripts/smoke-runtime-<scenario>.mjs` file only.
+
 All smoke scripts invoke the canonical local Lifeline CLI entrypoint (`node dist/cli.js`) and therefore require `pnpm build` beforehand so `dist/cli.js` exists.
 
 ## Early target manifests
