@@ -67,6 +67,7 @@
     "smoke:runtime:restore-malformed-env-file": "node scripts/smoke-runtime-restore-malformed-env-file.mjs",
     "smoke:runtime:up-malformed-manifest": "node scripts/smoke-runtime-up-malformed-manifest.mjs",
     "smoke:runtime:restart-malformed-manifest": "node scripts/smoke-runtime-restart-malformed-manifest.mjs",
+    "smoke:runtime:restart-invalid-manifest-shape": "node scripts/smoke-runtime-restart-invalid-manifest-shape.mjs",
     "smoke:runtime:restore-malformed-manifest": "node scripts/smoke-runtime-restore-malformed-manifest.mjs",
     "smoke:runtime:up-invalid-manifest-shape": "node scripts/smoke-runtime-up-invalid-manifest-shape.mjs"
   },
