@@ -200,6 +200,42 @@ The runner resolves files by `scripts/smoke-<mode>-<scenario>.mjs` naming conven
 
 All smoke scripts invoke the canonical local Lifeline CLI entrypoint (`node dist/cli.js`) and therefore require `pnpm build` beforehand so `dist/cli.js` exists.
 
+## Deterministic suite structure
+
+Lifeline keeps deterministic coverage discoverable through a single suite registry at `scripts/test-suites.json`.
+
+Available deterministic suites:
+
+- `contracts`
+- `core`
+- `commands`
+- `utilities`
+- `examples`
+
+Use the deterministic test runner to inspect and execute suites:
+
+```bash
+# list available suites
+node scripts/test-runner.mjs list
+
+# run one suite
+node scripts/test-runner.mjs run core
+
+# run all suites
+node scripts/test-runner.mjs run all
+```
+
+Suite intent follows a stable split:
+
+- **Smoke tests** validate end-to-end runtime flows and fixture-backed behavior.
+- **Deterministic suites** validate contracts, command behavior, and helper/runtime primitives with stable, script-level coverage.
+
+Docs rule summary:
+
+- **Rule:** Test structure should be discoverable from the repo, not tribal knowledge.
+- **Pattern:** Smoke tests prove runtime flows; deterministic suites prove contracts and helpers.
+- **Failure Mode:** Without docs parity, new coverage lands but nobody knows how to run or extend it consistently.
+
 ## Early target manifests
 
 The fitness app and Playbook UI remain early Lifeline targets. Their manifests continue to document the shared contract shape, but actual runtime execution requires a valid local `deploy.workingDirectory` on the machine where Lifeline runs. Their application code does not live in this repository.
