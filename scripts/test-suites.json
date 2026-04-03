@@ -1,0 +1,65 @@
+{
+  "contracts": [
+    "test-app-manifest-contract-deterministic.mjs",
+    "test-doc-manifest-contract-parity-deterministic.mjs",
+    "test-doc-startup-contract-parity-deterministic.mjs",
+    "test-errors-contract-deterministic.mjs",
+    "test-fitness-mirror-contract-deterministic.mjs",
+    "test-startup-command-contract-deterministic.mjs"
+  ],
+  "core": [
+    "test-ensure-built-deterministic.mjs",
+    "test-healthcheck-deterministic.mjs",
+    "test-load-env-file-deterministic.mjs",
+    "test-load-playbook-archetype-defaults-deterministic.mjs",
+    "test-load-playbook-exports-schema-compat-deterministic.mjs",
+    "test-log-store-deterministic.mjs",
+    "test-parse-simple-yaml-deterministic.mjs",
+    "test-process-manager-find-listener-pid-deterministic.mjs",
+    "test-process-manager-stop-process-deterministic.mjs",
+    "test-process-manager-wait-for-port-clear-deterministic.mjs",
+    "test-resolve-config-deterministic.mjs",
+    "test-resolve-playbook-path-deterministic.mjs",
+    "test-resolve-working-directory-deterministic.mjs",
+    "test-restore-runtime-state-reset-deterministic.mjs",
+    "test-restore-supervisor-pid-coherence-deterministic.mjs",
+    "test-runtime-smoke-fixture-deterministic.mjs",
+    "test-runtime-state-atomic-write-deterministic.mjs",
+    "test-runtime-state-invalid-shape-deterministic.mjs",
+    "test-runtime-state-malformed-deterministic.mjs",
+    "test-startup-state-atomic-write-deterministic.mjs",
+    "test-startup-state-invalid-shape-deterministic.mjs",
+    "test-supervisor-blocked-state-clears-listener-deterministic.mjs",
+    "test-supervisor-blocked-state-clears-runtime-pids-deterministic.mjs"
+  ],
+  "commands": [
+    "test-cli-dispatch-deterministic.mjs",
+    "test-cli-error-surfacing-deterministic.mjs",
+    "test-cli-playbook-option-deterministic.mjs",
+    "test-down-command-deterministic.mjs",
+    "test-logs-command-deterministic.mjs",
+    "test-resolve-command-deterministic.mjs",
+    "test-resolve-command-playbook-env-path-deterministic.mjs",
+    "test-restart-command-deterministic.mjs",
+    "test-restore-non-restorable-skip-message-deterministic.mjs",
+    "test-status-command-deterministic.mjs",
+    "test-up-command-deterministic.mjs",
+    "test-up-command-playbook-env-path-deterministic.mjs"
+  ],
+  "utilities": [
+    "test-direct-script-invocation-deterministic.mjs",
+    "test-readme-command-surface-deterministic.mjs",
+    "test-readme-script-reference-deterministic.mjs",
+    "test-smoke-runner-deterministic.mjs",
+    "test-startup-roundtrip-windows-deterministic.mjs",
+    "test-wave2-startup-deterministic.mjs"
+  ],
+  "examples": [
+    "test-example-manifests-deterministic.mjs",
+    "test-validate-boundaries.mjs",
+    "test-validate-fitness-mirror-path-parity-deterministic.mjs",
+    "test-validate-fitness-mirror-script-deterministic.mjs",
+    "test-validate-invalid-playbook-export-deterministic.mjs",
+    "test-validate-playbook-env-path-deterministic.mjs"
+  ]
+}
