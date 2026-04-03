@@ -102,6 +102,11 @@ function expectFailure(name, result, expectedErrorFamily) {
   }
 
   assert(
+    result.stdout.trim().length === 0,
+    `${name}: expected no stdout on failure, received:\n${result.stdout}`,
+  );
+
+  assert(
     result.stderr.includes(expectedErrorFamily),
     `${name}: expected stderr to include \"${expectedErrorFamily}\".\nstderr:\n${result.stderr}`,
   );
