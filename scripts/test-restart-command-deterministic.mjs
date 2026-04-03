@@ -228,6 +228,10 @@ async function main() {
       noHistory.stderr.trim() === `No runtime state found for app ${appName}.`,
       `no-history: expected exact missing-state message, got stderr=${JSON.stringify(noHistory.stderr)}`,
     );
+    assert(
+      noHistory.stdout.trim() === "",
+      `no-history: expected empty stdout, got stdout=${JSON.stringify(noHistory.stdout)}`,
+    );
 
     await runCli(tempRoot, ["up", fixture.playbookManifestPath, "--playbook-path", fixture.playbookExportPath]);
     const running = await waitForRunningState(tempRoot, appName);
@@ -260,6 +264,11 @@ async function main() {
       !blockedRestart.stderr.includes("Cannot read manifest") &&
         !blockedRestart.stderr.includes("does-not-exist.lifeline.yml"),
       `down-fails path: expected no up-stage manifest evaluation, got stderr=${JSON.stringify(blockedRestart.stderr)}`,
+    );
+    const blockedStateAfterRestart = await readAppState(tempRoot, appName);
+    assert(
+      blockedStateAfterRestart?.manifestPath === path.join(tempRoot, "does-not-exist.lifeline.yml"),
+      `down-fails path: expected restart to leave persisted manifestPath untouched, got ${blockedStateAfterRestart?.manifestPath}`,
     );
 
     await stopProcess(foreignServer);

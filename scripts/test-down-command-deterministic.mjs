@@ -194,6 +194,10 @@ async function main() {
       noHistory.stderr.trim() === `No runtime state found for app ${appName}.`,
       `no-history: expected exact missing-state message, got stderr=${JSON.stringify(noHistory.stderr)}`,
     );
+    assert(
+      noHistory.stdout.trim() === "",
+      `no-history: expected empty stdout, got stdout=${JSON.stringify(noHistory.stdout)}`,
+    );
 
     await runCli(tempRoot, ["up", manifestPath]);
     await waitForRunningState(tempRoot, appName);
@@ -203,6 +207,10 @@ async function main() {
     assert(
       success.stdout.trim() === `App ${appName} has been stopped.`,
       `success: expected exact stop message, got stdout=${JSON.stringify(success.stdout.trim())}`,
+    );
+    assert(
+      success.stderr.trim() === "",
+      `success: expected empty stderr, got stderr=${JSON.stringify(success.stderr)}`,
     );
 
     await runCli(tempRoot, ["up", manifestPath]);
@@ -219,6 +227,10 @@ async function main() {
     assert(
       blocked.stderr.includes(`App ${appName} could not be fully stopped: down failed: port ${runtimePort}`),
       `blocked path: expected blocked-message family, got stderr=${JSON.stringify(blocked.stderr)}`,
+    );
+    assert(
+      blocked.stdout.trim() === "",
+      `blocked path: expected empty stdout, got stdout=${JSON.stringify(blocked.stdout)}`,
     );
 
     const blockedState = await readAppState(tempRoot, appName);
