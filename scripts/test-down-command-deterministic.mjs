@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -14,6 +15,30 @@ function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+async function getAvailablePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("Failed to allocate an available test port.")));
+        return;
+      }
+
+      const { port } = address;
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve(port);
+      });
+    });
+  });
 }
 
 function runCli(cwd, args, { allowFailure = false } = {}) {
@@ -154,9 +179,9 @@ async function stopProcess(child) {
 
 async function main() {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "lifeline-down-command-deterministic-"));
-  const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const uniqueSuffix = `${Date.now()}-${process.pid}`;
   const appName = `down-command-${uniqueSuffix}`;
-  const runtimePort = 9500 + Math.floor(Math.random() * 300);
+  const runtimePort = await getAvailablePort();
 
   let foreignServer;
 
@@ -176,8 +201,8 @@ async function main() {
     const success = await runCli(tempRoot, ["down", appName]);
     assert(success.code === 0, `success: expected exit code 0, got ${success.code}`);
     assert(
-      success.stdout.includes(`App ${appName} has been stopped.`),
-      `success: expected exact stop message, got stdout=${JSON.stringify(success.stdout)}`,
+      success.stdout.trim() === `App ${appName} has been stopped.`,
+      `success: expected exact stop message, got stdout=${JSON.stringify(success.stdout.trim())}`,
     );
 
     await runCli(tempRoot, ["up", manifestPath]);

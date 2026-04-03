@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -14,6 +15,30 @@ function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+async function getAvailablePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("Failed to allocate an available test port.")));
+        return;
+      }
+
+      const { port } = address;
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve(port);
+      });
+    });
+  });
 }
 
 function runCli(cwd, args, { allowFailure = false } = {}) {
@@ -188,9 +213,9 @@ async function stopProcess(child) {
 
 async function main() {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "lifeline-restart-command-deterministic-"));
-  const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const uniqueSuffix = `${Date.now()}-${process.pid}`;
   const appName = `restart-command-${uniqueSuffix}`;
-  const runtimePort = 9800 + Math.floor(Math.random() * 150);
+  const runtimePort = await getAvailablePort();
 
   let foreignServer;
 
@@ -228,6 +253,10 @@ async function main() {
       `down-fails path: expected down failure propagation, got stderr=${JSON.stringify(blockedRestart.stderr)}`,
     );
     assert(
+      blockedRestart.stdout.trim() === "",
+      `down-fails path: expected no success output from up stage, got stdout=${JSON.stringify(blockedRestart.stdout)}`,
+    );
+    assert(
       !blockedRestart.stderr.includes("Cannot read manifest") &&
         !blockedRestart.stderr.includes("does-not-exist.lifeline.yml"),
       `down-fails path: expected no up-stage manifest evaluation, got stderr=${JSON.stringify(blockedRestart.stderr)}`,
@@ -262,6 +291,14 @@ async function main() {
     assert(
       finalState.lastKnownStatus === "running",
       `success: expected persisted status=running, got ${finalState.lastKnownStatus}`,
+    );
+    assert(
+      finalState.manifestPath === fixture.playbookManifestPath,
+      `success: expected persisted manifestPath=${fixture.playbookManifestPath}, got ${finalState.manifestPath}`,
+    );
+    assert(
+      finalState.playbookPath === fixture.playbookExportPath,
+      `success: expected persisted playbookPath=${fixture.playbookExportPath}, got ${finalState.playbookPath}`,
     );
 
     console.log("Deterministic restart command IO verification passed.");
