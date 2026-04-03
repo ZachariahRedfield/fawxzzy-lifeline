@@ -254,6 +254,34 @@ try {
   if (persistedAfterRestore.lastKnownStatus === "running") {
     throw new Error("Expected persisted state not to flip back to running after failed restore");
   }
+  if (persistedAfterRestore.lastKnownStatus !== "stopped") {
+    throw new Error(
+      `Expected failed restore to reconcile persisted status to stopped, found ${persistedAfterRestore.lastKnownStatus}`,
+    );
+  }
+  if (persistedAfterRestore.crashLoopDetected) {
+    throw new Error("Expected failed restore to clear crashLoopDetected");
+  }
+  if (persistedAfterRestore.blockedReason !== undefined) {
+    throw new Error(
+      `Expected failed restore to clear blockedReason, found ${persistedAfterRestore.blockedReason}`,
+    );
+  }
+  if (persistedAfterRestore.wrapperPid !== undefined) {
+    throw new Error(
+      `Expected failed restore to clear wrapperPid, found ${persistedAfterRestore.wrapperPid}`,
+    );
+  }
+  if (persistedAfterRestore.listenerPid !== undefined) {
+    throw new Error(
+      `Expected failed restore to clear listenerPid, found ${persistedAfterRestore.listenerPid}`,
+    );
+  }
+  if (persistedAfterRestore.portOwnerPid !== undefined) {
+    throw new Error(
+      `Expected failed restore to clear portOwnerPid, found ${persistedAfterRestore.portOwnerPid}`,
+    );
+  }
 
   if (
     persistedAfterRestore.supervisorPid &&
@@ -272,6 +300,11 @@ try {
   ) {
     throw new Error(
       `Expected no replacement managed child after restore failure, found pid ${persistedAfterRestore.childPid}`,
+    );
+  }
+  if (persistedAfterRestore.childPid !== undefined) {
+    throw new Error(
+      `Expected failed restore to clear childPid, found ${persistedAfterRestore.childPid}`,
     );
   }
 

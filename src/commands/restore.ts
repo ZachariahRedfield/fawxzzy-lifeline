@@ -40,6 +40,16 @@ export async function runRestoreCommand(): Promise<number> {
       await prepareRuntimeApp(app.manifestPath, app.playbookPath);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      await upsertAppState({
+        ...app,
+        childPid: undefined,
+        wrapperPid: undefined,
+        listenerPid: undefined,
+        portOwnerPid: undefined,
+        blockedReason: undefined,
+        lastKnownStatus: "stopped",
+        crashLoopDetected: false,
+      });
       console.error(`Failed to restore ${app.name}: ${message}`);
       failures += 1;
       continue;
