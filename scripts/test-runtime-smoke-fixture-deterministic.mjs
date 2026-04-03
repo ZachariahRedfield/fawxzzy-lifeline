@@ -27,7 +27,6 @@ function runCli(args) {
   return {
     status: result.status ?? 1,
     stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
     output: `${result.stdout ?? ""}${result.stderr ?? ""}`,
   };
 }
@@ -36,18 +35,18 @@ function assertSuccess(result, label) {
   assert(result.status === 0, `${label} failed.\n${result.output}`);
 }
 
+function assertContainsAll(output, markers) {
+  for (const marker of markers) {
+    assert(output.includes(marker), `Expected output marker \"${marker}\".\n${output}`);
+  }
+}
+
 const validateFixtureRelative = runCli(["validate", fixtureManifestPath]);
 const validateFixtureAbsolute = runCli(["validate", resolve(repoRoot, fixtureManifestPath)]);
 assertSuccess(validateFixtureRelative, "runtime smoke fixture relative validate");
 assertSuccess(validateFixtureAbsolute, "runtime smoke fixture absolute validate");
-assert(
-  validateFixtureRelative.stdout.includes("Manifest is valid:"),
-  `Expected runtime smoke fixture validate success banner.\n${validateFixtureRelative.output}`,
-);
-assert(
-  validateFixtureAbsolute.stdout.includes("Manifest is valid:"),
-  `Expected absolute runtime smoke fixture validate success banner.\n${validateFixtureAbsolute.output}`,
-);
+assertContainsAll(validateFixtureRelative.stdout, ["Manifest is valid:", "- app: runtime-smoke-app", "- port: 5322"]);
+assertContainsAll(validateFixtureAbsolute.stdout, ["Manifest is valid:", "- app: runtime-smoke-app", "- port: 5322"]);
 
 const resolvedFixtureResult = runCli(["resolve", fixtureManifestPath]);
 assertSuccess(resolvedFixtureResult, "runtime smoke fixture resolve");
@@ -84,17 +83,22 @@ const resolvedWorkingDir = resolve(fixtureDir, resolvedFixture.deploy.workingDir
 assert(existsSync(resolvedWorkingDir), `Expected resolved workingDirectory to exist: ${resolvedWorkingDir}`);
 assert(existsSync(resolve(resolvedWorkingDir, "server.js")), "Expected server.js to exist in resolved workingDirectory.");
 
-const validatePlaybookFixture = runCli([
+const validatePlaybookFixtureRelative = runCli([
   "validate",
   fixturePlaybookManifestPath,
   "--playbook-path",
   playbookPath,
 ]);
-assertSuccess(validatePlaybookFixture, "runtime playbook fixture validate");
-assert(
-  validatePlaybookFixture.stdout.includes("Resolved manifest is valid:"),
-  `Expected playbook fixture validate success banner.\n${validatePlaybookFixture.output}`,
-);
+const validatePlaybookFixtureAbsolute = runCli([
+  "validate",
+  resolve(repoRoot, fixturePlaybookManifestPath),
+  "--playbook-path",
+  resolve(repoRoot, playbookPath),
+]);
+assertSuccess(validatePlaybookFixtureRelative, "runtime playbook fixture relative validate");
+assertSuccess(validatePlaybookFixtureAbsolute, "runtime playbook fixture absolute validate");
+assertContainsAll(validatePlaybookFixtureRelative.stdout, ["Resolved manifest is valid:", "- app: runtime-smoke-app", "- port: 4387"]);
+assertContainsAll(validatePlaybookFixtureAbsolute.stdout, ["Resolved manifest is valid:", "- app: runtime-smoke-app", "- port: 4387"]);
 
 const resolvedPlaybookFixtureResult = runCli([
   "resolve",
@@ -126,5 +130,10 @@ assert(
   resolvedPlaybookFixture.runtime?.restorable === true,
   `Expected playbook runtime.restorable=true, got ${resolvedPlaybookFixture.runtime?.restorable}`,
 );
+
+const playbookEnvPath = resolve(fixtureDir, resolvedPlaybookFixture.env.file);
+assert(existsSync(playbookEnvPath), `Expected playbook fixture env file to exist: ${playbookEnvPath}`);
+const playbookWorkingDir = resolve(fixtureDir, resolvedPlaybookFixture.deploy.workingDirectory);
+assert(existsSync(playbookWorkingDir), `Expected playbook resolved workingDirectory to exist: ${playbookWorkingDir}`);
 
 console.log("Runtime smoke fixture deterministic verification passed.");
