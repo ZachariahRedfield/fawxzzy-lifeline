@@ -13,7 +13,7 @@ import { runSupervisor } from "./core/supervisor.js";
 
 function printUsage(): void {
   console.log(
-    "Lifeline v1 + Wave 2 startup contract\n\nUsage:\n  lifeline validate <manifest-path> [--playbook-path <path>]\n  lifeline resolve <manifest-path> [--playbook-path <path>]\n  lifeline up <manifest-path> [--playbook-path <path>]\n  lifeline down <app-name>\n  lifeline status <app-name>\n  lifeline logs <app-name> [line-count]\n  lifeline restart <app-name> [--playbook-path <path>]\n  lifeline restore\n  lifeline startup <enable|disable|status> [--dry-run]",
+    "Lifeline v1 + Wave 2 startup contract\n\nUsage:\n  lifeline validate <manifest-path> [--playbook-path <path>]\n  lifeline resolve <manifest-path> [--playbook-path <path>]\n  lifeline up <manifest-path> [--playbook-path <path>]\n  lifeline down <app-name>\n  lifeline status <app-name> [--proof|--proof-text] [--proof-gate]\n  lifeline logs <app-name> [line-count]\n  lifeline restart <app-name> [--playbook-path <path>]\n  lifeline restore\n  lifeline startup <enable|disable|status> [--dry-run]",
   );
 }
 
@@ -21,9 +21,13 @@ function parsePlaybookOption(args: string[]): {
   target?: string | undefined;
   option?: string | undefined;
   playbookPath?: string | undefined;
+  statusProofMode?: "json" | "text" | undefined;
+  enforceProofGate?: boolean | undefined;
 } {
   const positional: string[] = [];
   let playbookPath: string | undefined;
+  let statusProofMode: "json" | "text" | undefined;
+  let enforceProofGate = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -43,6 +47,21 @@ function parsePlaybookOption(args: string[]): {
       index += 1;
       continue;
     }
+
+    if (arg === "--proof" || arg === "--proof-json") {
+      statusProofMode = "json";
+      continue;
+    }
+
+    if (arg === "--proof-text") {
+      statusProofMode = "text";
+      continue;
+    }
+
+    if (arg === "--enforce-proof-gate" || arg === "--proof-gate") {
+      enforceProofGate = true;
+      continue;
+    }
     positional.push(arg);
   }
 
@@ -50,12 +69,14 @@ function parsePlaybookOption(args: string[]): {
     target: positional[0],
     option: positional[1],
     ...(playbookPath ? { playbookPath } : {}),
+    ...(statusProofMode ? { statusProofMode } : {}),
+    ...(enforceProofGate ? { enforceProofGate } : {}),
   };
 }
 
 async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
-  const { target, option, playbookPath } = parsePlaybookOption(rest);
+  const { target, option, playbookPath, statusProofMode, enforceProofGate } = parsePlaybookOption(rest);
 
   if (!command || command === "--help" || command === "-h") {
     printUsage();
@@ -97,7 +118,11 @@ async function main(argv: string[]): Promise<number> {
         printUsage();
         return 1;
       }
-      return runStatusCommand(target);
+      return runStatusCommand(target, {
+        ...(statusProofMode === "json" ? { mode: "proof-json" as const } : {}),
+        ...(statusProofMode === "text" ? { mode: "proof-text" as const } : {}),
+        ...(enforceProofGate ? { enforceProofGate: true } : {}),
+      });
     case "logs": {
       if (!target) {
         console.error("Missing app name.");
