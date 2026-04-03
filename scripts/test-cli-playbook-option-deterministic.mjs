@@ -31,24 +31,36 @@ async function runCli(args) {
 
 await ensureBuilt();
 
-const beforePositional = await runCli(['down', '--playbook-path', '/tmp/example-playbook', 'demo-app']);
+const beforePositional = await runCli([
+  'logs',
+  '--playbook-path',
+  '/tmp/example-playbook',
+  'demo-app',
+  'not-a-number',
+]);
 assert(
   beforePositional.code === 1,
   `--playbook-path before positional: expected exit code 1, got ${beforePositional.code}`,
 );
 assert(
-  beforePositional.stderr.includes('No runtime state found for app demo-app.'),
-  `--playbook-path before positional: expected command routing to keep target as app name, got ${JSON.stringify(beforePositional.stderr)}`,
+  beforePositional.stderr.includes('Invalid line count: not-a-number'),
+  `--playbook-path before positional: expected logs argument routing to preserve line count position, got ${JSON.stringify(beforePositional.stderr)}`,
 );
 
-const afterPositional = await runCli(['down', 'demo-app', '--playbook-path', '/tmp/example-playbook']);
+const afterPositional = await runCli([
+  'logs',
+  'demo-app',
+  'not-a-number',
+  '--playbook-path',
+  '/tmp/example-playbook',
+]);
 assert(
   afterPositional.code === 1,
   `--playbook-path after positional: expected exit code 1, got ${afterPositional.code}`,
 );
 assert(
-  afterPositional.stderr.includes('No runtime state found for app demo-app.'),
-  `--playbook-path after positional: expected command routing to keep target as app name, got ${JSON.stringify(afterPositional.stderr)}`,
+  afterPositional.stderr.includes('Invalid line count: not-a-number'),
+  `--playbook-path after positional: expected logs argument routing to preserve line count position, got ${JSON.stringify(afterPositional.stderr)}`,
 );
 
 const missingPlaybookValue = await runCli(['down', 'demo-app', '--playbook-path']);
@@ -61,7 +73,7 @@ assert(
   `missing playbook value: expected error message, got ${JSON.stringify(missingPlaybookValue.stderr)}`,
 );
 
-const optionNotPositional = await runCli(['down', '--playbook-path', '/tmp/example-playbook']);
+const optionNotPositional = await runCli(['logs', '--playbook-path', '/tmp/example-playbook']);
 assert(
   optionNotPositional.code === 1,
   `option not positional: expected exit code 1, got ${optionNotPositional.code}`,

@@ -112,6 +112,17 @@ assert(
 );
 assertUsagePrinted(missingAppLogs, 'logs missing app');
 
+const missingAppRestart = await runCli(['restart']);
+assert(
+  missingAppRestart.code === 1,
+  `restart missing app: expected exit code 1, got ${missingAppRestart.code}`,
+);
+assert(
+  missingAppRestart.stderr.includes('Missing app name.'),
+  `restart missing app: expected error, got ${JSON.stringify(missingAppRestart.stderr)}`,
+);
+assertUsagePrinted(missingAppRestart, 'restart missing app');
+
 const invalidLogsLineCount = await runCli(['logs', 'demo-app', 'not-a-number']);
 assert(
   invalidLogsLineCount.code === 1,
