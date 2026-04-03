@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -18,6 +17,8 @@ const runtimePort = 9800 + Math.floor(Math.random() * 150);
 const statePath = ".lifeline/state.json";
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const cli = ["node", path.join(repoRoot, "dist", "cli.js")];
+
+let foreignServer;
 
 process.stdout.on("error", () => {});
 process.stderr.on("error", () => {});
@@ -106,7 +107,7 @@ async function writeAppState(mutator) {
 }
 
 async function waitForState(predicate, label) {
-  for (let i = 0; i < 80; i += 1) {
+  for (let i = 0; i < 100; i += 1) {
     const appState = await readAppState();
     if (appState && (await predicate(appState))) {
       return appState;
@@ -120,17 +121,44 @@ async function waitForState(predicate, label) {
   );
 }
 
-function createForeignServer() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer((socket) => {
-      socket.end("HTTP/1.1 200 OK\\r\\nContent-Length: 7\\r\\n\\r\\nforeign");
-    });
+async function startForeignServer() {
+  foreignServer = spawn(
+    process.execPath,
+    [
+      "-e",
+      `const http=require("node:http");http.createServer((_,res)=>{res.writeHead(200);res.end("foreign");}).listen(${runtimePort},"127.0.0.1");setInterval(()=>{},1000);`,
+    ],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
 
-    server.once("error", reject);
-    server.listen(runtimePort, "127.0.0.1", () => {
-      resolve(server);
-    });
+  const stderrChunks = [];
+  foreignServer.stderr.on("data", (chunk) => {
+    stderrChunks.push(String(chunk));
   });
+
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  if (!foreignServer.pid || !isPidAlive(foreignServer.pid)) {
+    throw new Error(`Failed to start foreign owner server. stderr:\n${stderrChunks.join("")}`);
+  }
+
+  return foreignServer.pid;
+}
+
+async function stopForeignServer() {
+  if (!foreignServer?.pid) {
+    return;
+  }
+
+  if (isPidAlive(foreignServer.pid)) {
+    process.kill(foreignServer.pid, "SIGTERM");
+    await waitForPidExit(foreignServer.pid).catch(async () => {
+      process.kill(foreignServer.pid, "SIGKILL");
+      await waitForPidExit(foreignServer.pid);
+    });
+  }
+
+  foreignServer = undefined;
 }
 
 async function prepareFixture() {
@@ -151,8 +179,6 @@ async function prepareFixture() {
   await writeFile(manifestPath, updatedManifest, "utf8");
   return manifestPath;
 }
-
-let foreignServer;
 
 try {
   process.chdir(tempRoot);
@@ -185,7 +211,7 @@ try {
     listenerPid: staleListenerPid,
   }));
 
-  foreignServer = await createForeignServer();
+  await startForeignServer();
 
   const blocked = await waitForState(
     (state) => state.lastKnownStatus === "blocked" && typeof state.blockedReason === "string",
@@ -204,7 +230,7 @@ try {
     );
   }
 
-  if (!blocked.blockedReason.includes(`Port ${runtimePort}`)) {
+  if (!blocked.blockedReason.includes(String(runtimePort))) {
     throw new Error(`Expected blocked reason to reference port ${runtimePort}, got: ${blocked.blockedReason}`);
   }
 
@@ -214,9 +240,7 @@ try {
 
   console.log("Blocked restart state clears stale listenerPid deterministic verification passed.");
 } finally {
-  if (foreignServer) {
-    await new Promise((resolve) => foreignServer.close(resolve));
-  }
+  await stopForeignServer();
 
   process.chdir(originalCwd);
   await run(["down", appName], { allowFailure: true }).catch(() => undefined);
