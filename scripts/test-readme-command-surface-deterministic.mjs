@@ -80,7 +80,9 @@ async function ensureBuiltCli(repoRoot) {
   try {
     await access(cliPath);
   } catch {
-    await execFileAsync('pnpm', ['build'], { cwd: repoRoot, env: process.env });
+    throw new Error(
+      'Missing dist/cli.js. Run `pnpm build` before README command-surface verification.',
+    );
   }
   return cliPath;
 }
@@ -116,10 +118,12 @@ async function main() {
 
   const usageLines = extractUsageLines(`${helpResult.stdout}\n${helpResult.stderr}`);
   const usageText = usageLines.map((line) => normalizeWhitespace(line)).join('\n');
+  const documentedCommands = new Set();
 
   for (const commandLine of readmeCommands) {
     const { command } = parseLifelineInvocation(commandLine);
     assert(command, `Unable to parse command from README line: ${commandLine}`);
+    documentedCommands.add(command);
 
     const commandAppearsInUsage = usageLines.some((line) => line.startsWith(`lifeline ${command}`));
     assert(
@@ -136,6 +140,25 @@ async function main() {
         throw new Error(`README references missing manifest path: ${manifestPath}`);
       }
     }
+  }
+
+  const expectedDocumentedCommands = [
+    'validate',
+    'resolve',
+    'up',
+    'status',
+    'logs',
+    'restart',
+    'restore',
+    'startup',
+    'down',
+  ];
+
+  for (const command of expectedDocumentedCommands) {
+    assert(
+      documentedCommands.has(command),
+      `README is missing documented command example for: lifeline ${command}`,
+    );
   }
 
   const startupCommands = readmeCommands.filter((line) => line.startsWith('pnpm lifeline startup '));

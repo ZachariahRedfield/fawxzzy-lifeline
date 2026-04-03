@@ -62,6 +62,11 @@ async function main() {
   const repoRoot = fileURLToPath(new URL('..', import.meta.url));
   const readmePath = path.join(repoRoot, 'README.md');
   const readmeText = await readFile(readmePath, 'utf8');
+  const packageJsonPath = path.join(repoRoot, 'package.json');
+  const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8'));
+  const packageScripts = packageJson && typeof packageJson === 'object' ? packageJson.scripts : undefined;
+
+  assert(packageScripts && typeof packageScripts === 'object', 'Expected package.json scripts object.');
 
   const nodeScriptCommands = extractCommands(readmeText, 'node scripts/');
   assert(nodeScriptCommands.length > 0, 'Expected README node scripts/* command examples.');
@@ -82,18 +87,36 @@ async function main() {
     await ensurePathExists(scenarioScript);
   }
 
-  const packageScriptToEntryPoint = new Map([
-    ['pnpm smoke:runtime', 'scripts/smoke-runtime.mjs'],
-    ['pnpm smoke:playbook', 'scripts/smoke-playbook-resolution.mjs'],
-    ['pnpm test:startup-deterministic', 'scripts/test-startup-command-contract-deterministic.mjs'],
-    ['pnpm test:startup-roundtrip', 'scripts/test-startup-roundtrip-windows-deterministic.mjs'],
-  ]);
+  const packageBackedReadmeCommands = [
+    'pnpm smoke:runtime',
+    'pnpm smoke:playbook',
+    'pnpm test:startup-deterministic',
+    'pnpm test:startup-roundtrip',
+  ];
 
-  for (const [command, entryPoint] of packageScriptToEntryPoint.entries()) {
+  for (const command of packageBackedReadmeCommands) {
     if (!readmeText.includes(command)) {
       continue;
     }
-    await ensurePathExists(path.join(repoRoot, entryPoint));
+    const scriptName = command.replace(/^pnpm\s+/, '');
+    assert(
+      Object.prototype.hasOwnProperty.call(packageScripts, scriptName),
+      `README references missing package script: ${scriptName}`,
+    );
+    const scriptValue = packageScripts[scriptName];
+    assert(typeof scriptValue === 'string', `Package script ${scriptName} must be a string.`);
+
+    const referencedScripts = Array.from(scriptValue.matchAll(/scripts\/[^\s"'`]+\.mjs/g)).map(
+      (match) => match[0],
+    );
+    assert(
+      referencedScripts.length > 0,
+      `Package script ${scriptName} does not reference any scripts/*.mjs entrypoint.`,
+    );
+
+    for (const referencedScript of referencedScripts) {
+      await ensurePathExists(path.join(repoRoot, referencedScript));
+    }
   }
 
   console.log('README script reference deterministic verification passed.');
