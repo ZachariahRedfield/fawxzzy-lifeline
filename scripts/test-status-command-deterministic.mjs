@@ -316,6 +316,34 @@ try {
     "blocked: missing portOwner summary",
   );
 
+
+  const proofJsonResult = await runCli(["status", blockedApp, "--proof"], { cwd: tempRoot, allowFailure: true });
+  assert(proofJsonResult.code === 0, `proof-json: expected exit 0, got ${proofJsonResult.code}`);
+  assert(proofJsonResult.stderr.trim() === "", `proof-json: expected empty stderr, got ${JSON.stringify(proofJsonResult.stderr)}`);
+  const proofJsonPayload = JSON.parse(proofJsonResult.stdout);
+  assert(proofJsonPayload.mode === "proof", `proof-json: expected mode=proof, got ${proofJsonPayload.mode}`);
+  assert(proofJsonPayload.proof?.ok === false, `proof-json: expected proof.ok=false, got ${proofJsonPayload.proof?.ok}`);
+  assert(proofJsonPayload.proof?.state === "blocked", `proof-json: expected blocked state, got ${proofJsonPayload.proof?.state}`);
+
+  const proofJsonGateResult = await runCli(["status", blockedApp, "--proof", "--proof-gate"], {
+    cwd: tempRoot,
+    allowFailure: true,
+  });
+  assert(proofJsonGateResult.code === 1, `proof-gate: expected exit 1, got ${proofJsonGateResult.code}`);
+  assert(proofJsonGateResult.stderr.trim() === "", `proof-gate: expected empty stderr, got ${JSON.stringify(proofJsonGateResult.stderr)}`);
+  const proofJsonGatePayload = JSON.parse(proofJsonGateResult.stdout);
+  assert(proofJsonGatePayload.mode === "proof", `proof-gate: expected mode=proof, got ${proofJsonGatePayload.mode}`);
+  assert(proofJsonGatePayload.proof?.ok === false, `proof-gate: expected proof.ok=false, got ${proofJsonGatePayload.proof?.ok}`);
+
+  const proofTextResult = await runCli(["status", blockedApp, "--proof-text"], { cwd: tempRoot, allowFailure: true });
+  assert(proofTextResult.code === 0, `proof-text: expected exit 0, got ${proofTextResult.code}`);
+  assert(proofTextResult.stderr.trim() === "", `proof-text: expected empty stderr, got ${JSON.stringify(proofTextResult.stderr)}`);
+  assertIncludesLine(
+    proofTextResult.stdout,
+    `Proof status for ${blockedApp}: blocked`,
+    "proof-text: missing operator brief status line",
+  );
+
   const finalStateRaw = await readFile(path.join(tempRoot, ".lifeline", "state.json"), "utf8");
   const finalState = JSON.parse(finalStateRaw);
   assert(finalState.apps?.[blockedApp]?.lastKnownStatus === "blocked", "blocked: expected persisted status to be blocked");

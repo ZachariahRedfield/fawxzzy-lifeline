@@ -15,3 +15,16 @@ Link related pull requests whenever possible.
   - Governance rule requires runtime changes to be documented with WHAT/WHY.
 - Evidence (PR / issue / commit):
   - Follow-up commit on this branch addressing smoke timeout waiting for `restartCount >= 1`.
+
+## 2026-04-03
+
+- WHAT changed:
+  - Refactored status proof-mode control flow so proof payload serialization is invariant and always emitted before any proof-gate exit enforcement is applied.
+  - Added proof output modes for `status` (`--proof` JSON and `--proof-text` operator brief) and explicit gate enforcement (`--proof-gate` / `--enforce-proof-gate`).
+  - Extended deterministic status verification to assert additive-safe proof payload emission on both success and enforced-failure paths.
+- Pattern:
+  - Serialize proof state first, apply enforcement exit policy second.
+- Failure mode addressed:
+  - Short-circuiting unhealthy proof states into generic CLI failure output can drop the proof contract and incorrectly force non-zero exits for operator-facing proof status.
+- WHY it changed:
+  - Keeps operator status reporting readable and stable while preserving fail-closed behavior for explicit proof-gate use cases.
