@@ -6,6 +6,10 @@ import { checkHealth } from "../core/healthcheck.js";
 import { getAppState, upsertAppState } from "../core/state-store.js";
 
 type StatusMode = "standard" | "proof-json" | "proof-text";
+enum ExitCode {
+  Success = 0,
+  Failure = 1,
+}
 
 type StatusCommandOptions = {
   mode?: StatusMode;
@@ -122,7 +126,15 @@ function serializeProofPayload(snapshot: RuntimeSnapshot): {
 }
 
 function printProofText(payload: ReturnType<typeof serializeProofPayload>): void {
+  const decisionByState: Record<ProofState, string> = {
+    ready: "parallel_guard_ready",
+    blocked: "parallel_guard_blocked",
+    conflicted: "parallel_guard_conflicted",
+    "not-ready": "parallel_guard_not_ready",
+  };
+
   console.log(`Proof status for ${payload.runtime.app}: ${payload.proof.state}`);
+  console.log(`Decision: ${decisionByState[payload.proof.state]}`);
   console.log(`- proof.ok: ${payload.proof.ok}`);
   console.log(`- reasons: ${payload.proof.reasons.join("; ")}`);
   console.log(`- supervisorAlive: ${payload.runtime.supervisor_alive}`);
@@ -140,7 +152,7 @@ export async function runStatusCommand(
   const state = await getAppState(appName);
   if (!state) {
     console.error(`No runtime state found for app ${appName}.`);
-    return 1;
+    return ExitCode.Failure;
   }
 
   const supervisorAlive = await isProcessAlive(state.supervisorPid);
@@ -217,7 +229,11 @@ export async function runStatusCommand(
       printProofText(payload);
     }
 
-    return options.enforceProofGate && !payload.proof.ok ? 1 : 0;
+    if (options.enforceProofGate && !payload.proof.ok) {
+      return ExitCode.Failure;
+    }
+
+    return ExitCode.Success;
   }
 
   console.log(`App ${appName} is ${state.lastKnownStatus}.`);
@@ -260,5 +276,7 @@ export async function runStatusCommand(
     `- health: ${health.ok ? `ok (${health.status ?? 200})` : (health.error ?? "failed")}`,
   );
 
-  return supervisorAlive && health.ok && managedChildAlive && managedPortOwner ? 0 : 1;
+  return supervisorAlive && health.ok && managedChildAlive && managedPortOwner
+    ? ExitCode.Success
+    : ExitCode.Failure;
 }

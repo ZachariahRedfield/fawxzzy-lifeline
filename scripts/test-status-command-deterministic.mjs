@@ -117,13 +117,15 @@ async function writeState(tempRoot, state) {
   await writeFile(path.join(lifelineDir, "state.json"), `${JSON.stringify(state, null, 2)}\n`, "utf8");
 }
 
-function startHealthServer(port) {
+function startHealthServer(port, { healthy = true } = {}) {
+  const healthyStatus = healthy ? 200 : 503;
+  const healthyBody = healthy ? "ok" : "unhealthy";
   const script = `
     const http = require("node:http");
     const server = http.createServer((req, res) => {
       if (req.url === "/healthz") {
-        res.writeHead(200, {"content-type": "text/plain"});
-        res.end("ok");
+        res.writeHead(${healthyStatus}, {"content-type": "text/plain"});
+        res.end(${JSON.stringify(healthyBody)});
         return;
       }
 
@@ -201,6 +203,7 @@ const tempRoot = await mkdtemp(path.join(os.tmpdir(), "lifeline-status-command-"
 
 let runningServer;
 let blockedServer;
+let conflictedServer;
 
 try {
   const noHistoryApp = "status-no-history-deterministic";
@@ -343,14 +346,72 @@ try {
     `Proof status for ${blockedApp}: blocked`,
     "proof-text: missing operator brief status line",
   );
+  assertIncludesLine(
+    proofTextResult.stdout,
+    "Decision: parallel_guard_blocked",
+    "proof-text: missing operator brief decision line",
+  );
 
-  const finalStateRaw = await readFile(path.join(tempRoot, ".lifeline", "state.json"), "utf8");
-  const finalState = JSON.parse(finalStateRaw);
-  assert(finalState.apps?.[blockedApp]?.lastKnownStatus === "blocked", "blocked: expected persisted status to be blocked");
+  const proofTextGateResult = await runCli(["status", blockedApp, "--proof-text", "--proof-gate"], {
+    cwd: tempRoot,
+    allowFailure: true,
+  });
+  assert(proofTextGateResult.code === 1, `proof-text-gate: expected exit 1, got ${proofTextGateResult.code}`);
+  assert(
+    proofTextGateResult.stderr.trim() === "",
+    `proof-text-gate: expected empty stderr, got ${JSON.stringify(proofTextGateResult.stderr)}`,
+  );
+  assertIncludesLine(
+    proofTextGateResult.stdout,
+    "Decision: parallel_guard_blocked",
+    "proof-text-gate: missing operator brief decision line",
+  );
+  const blockedStateRaw = await readFile(path.join(tempRoot, ".lifeline", "state.json"), "utf8");
+  const blockedState = JSON.parse(blockedStateRaw);
+  assert(blockedState.apps?.[blockedApp]?.lastKnownStatus === "blocked", "blocked: expected persisted status to be blocked");
+
+  const conflictedApp = "status-conflicted-deterministic";
+  const conflictedPort = await getFreePort();
+  conflictedServer = await startHealthServer(conflictedPort, { healthy: false });
+
+  await writeState(
+    tempRoot,
+    createState(conflictedApp, {
+      port: conflictedPort,
+      supervisorPid: process.pid,
+      childPid: conflictedServer.pid,
+      listenerPid: conflictedServer.pid,
+      lastKnownStatus: "running",
+      blockedReason: undefined,
+    }),
+  );
+
+  const conflictedProofTextGateResult = await runCli(
+    ["status", conflictedApp, "--proof-text", "--proof-gate"],
+    {
+      cwd: tempRoot,
+      allowFailure: true,
+    },
+  );
+  assert(
+    conflictedProofTextGateResult.code === 1,
+    `conflicted-proof-text-gate: expected exit 1, got ${conflictedProofTextGateResult.code}`,
+  );
+  assertIncludesLine(
+    conflictedProofTextGateResult.stdout,
+    `Proof status for ${conflictedApp}: conflicted`,
+    "conflicted-proof-text-gate: missing operator brief status line",
+  );
+  assertIncludesLine(
+    conflictedProofTextGateResult.stdout,
+    "Decision: parallel_guard_conflicted",
+    "conflicted-proof-text-gate: missing operator brief decision line",
+  );
 
   console.log("status command deterministic verification passed.");
 } finally {
   await stopProcess(runningServer);
   await stopProcess(blockedServer);
+  await stopProcess(conflictedServer);
   await rm(tempRoot, { recursive: true, force: true });
 }
