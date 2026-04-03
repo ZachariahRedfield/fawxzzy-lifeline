@@ -29,6 +29,11 @@ type RuntimeSnapshot = {
 };
 
 type ProofState = "ready" | "blocked" | "conflicted" | "not-ready";
+type ProofDecision =
+  | "parallel_guard_ready"
+  | "parallel_guard_blocked"
+  | "parallel_guard_conflicted"
+  | "parallel_guard_not_ready";
 
 function deriveProof(snapshot: RuntimeSnapshot): {
   ok: boolean;
@@ -121,8 +126,24 @@ function serializeProofPayload(snapshot: RuntimeSnapshot): {
   };
 }
 
+function mapProofDecision(state: ProofState): ProofDecision {
+  switch (state) {
+    case "ready":
+      return "parallel_guard_ready";
+    case "blocked":
+      return "parallel_guard_blocked";
+    case "conflicted":
+      return "parallel_guard_conflicted";
+    case "not-ready":
+      return "parallel_guard_not_ready";
+  }
+}
+
 function printProofText(payload: ReturnType<typeof serializeProofPayload>): void {
+  const decision = mapProofDecision(payload.proof.state);
+
   console.log(`Proof status for ${payload.runtime.app}: ${payload.proof.state}`);
+  console.log(`Decision: ${decision}`);
   console.log(`- proof.ok: ${payload.proof.ok}`);
   console.log(`- reasons: ${payload.proof.reasons.join("; ")}`);
   console.log(`- supervisorAlive: ${payload.runtime.supervisor_alive}`);
@@ -131,6 +152,17 @@ function printProofText(payload: ReturnType<typeof serializeProofPayload>): void
   console.log(
     `- health: ${payload.runtime.health.ok ? `ok (${payload.runtime.health.status ?? 200})` : (payload.runtime.health.error ?? "failed")}`,
   );
+}
+
+function resolveProofExitCode(
+  payload: ReturnType<typeof serializeProofPayload>,
+  enforceProofGate: boolean,
+): number {
+  if (!enforceProofGate) {
+    return 0;
+  }
+
+  return payload.proof.ok ? 0 : 1;
 }
 
 export async function runStatusCommand(
@@ -217,7 +249,7 @@ export async function runStatusCommand(
       printProofText(payload);
     }
 
-    return options.enforceProofGate && !payload.proof.ok ? 1 : 0;
+    return resolveProofExitCode(payload, Boolean(options.enforceProofGate));
   }
 
   console.log(`App ${appName} is ${state.lastKnownStatus}.`);
