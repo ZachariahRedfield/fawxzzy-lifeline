@@ -1,0 +1,98 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+async function main() {
+  const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+
+  const [startupSource, startupDocs, readme] = await Promise.all([
+    readFile(path.join(repoRoot, 'src/core/startup-contract.ts'), 'utf8'),
+    readFile(path.join(repoRoot, 'docs/startup-contract.md'), 'utf8'),
+    readFile(path.join(repoRoot, 'README.md'), 'utf8'),
+  ]);
+
+  const actions = ['status', 'enable', 'disable'];
+  const scope = 'machine-local';
+  const restoreEntrypoint = 'lifeline restore';
+  const backendStatus = 'not-installed';
+
+  for (const action of actions) {
+    assert(
+      startupDocs.includes(`lifeline startup ${action}`),
+      `docs/startup-contract.md is missing startup action ${action} from CLI contract.`,
+    );
+    assert(
+      readme.includes(`pnpm lifeline startup ${action}`),
+      `README.md is missing startup action ${action} from CLI contract.`,
+    );
+  }
+
+  assert(
+    startupDocs.includes('enable [--dry-run]') && startupDocs.includes('disable [--dry-run]'),
+    'docs/startup-contract.md must document --dry-run support for enable/disable.',
+  );
+  assert(
+    readme.includes('startup enable --dry-run') && readme.includes('startup disable --dry-run'),
+    'README.md must document --dry-run support for startup enable/disable.',
+  );
+
+  for (const surface of [startupSource, startupDocs, readme]) {
+    assert(
+      surface.includes(scope),
+      `Startup contract parity drift: missing scope value \`${scope}\` in one startup contract surface.`,
+    );
+    assert(
+      surface.includes(restoreEntrypoint),
+      `Startup contract parity drift: missing restore entrypoint \`${restoreEntrypoint}\` in one startup contract surface.`,
+    );
+  }
+
+  assert(
+    startupSource.includes(`backendStatus: "${backendStatus}"`) || startupSource.includes(`backendStatus': '${backendStatus}'`),
+    `startup-contract.ts is expected to persist backendStatus \`${backendStatus}\`.`,
+  );
+  assert(
+    startupDocs.includes(`\`${backendStatus}\``),
+    `docs/startup-contract.md must mention backend readiness marker \`${backendStatus}\`.`,
+  );
+
+  const persistedFields = [
+    'version',
+    'scope',
+    'restoreEntrypoint',
+    'intent',
+    'backendStatus',
+    'updatedAt',
+  ];
+
+  for (const field of persistedFields) {
+    assert(
+      startupDocs.includes(`\`${field}\``),
+      `docs/startup-contract.md missing persisted startup metadata field \`${field}\`.`,
+    );
+  }
+
+  assert(
+    startupSource.includes('type StartupIntent = "enabled" | "disabled"'),
+    'startup-contract.ts is expected to define enabled/disabled startup intent union.',
+  );
+
+  assert(
+    startupDocs.includes('enabled') && startupDocs.includes('disabled'),
+    'docs/startup-contract.md must document enabled/disabled startup intent semantics.',
+  );
+
+  console.log('Doc/code startup contract parity deterministic verification passed.');
+}
+
+main().catch((error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`Doc/code startup parity deterministic verification failed: ${message}`);
+  process.exitCode = 1;
+});

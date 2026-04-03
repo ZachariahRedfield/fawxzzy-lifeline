@@ -33,7 +33,7 @@ Lifeline persists only minimal Wave 2 metadata in `.lifeline/startup.json`:
 - startup `scope` (`machine-local`)
 - `restoreEntrypoint` (`lifeline restore`)
 - desired `intent` (`enabled` or `disabled`)
-- backend readiness marker (`not-installed`)
+- `backendStatus` readiness marker (`not-installed`)
 - `updatedAt` timestamp
 
 No platform-specific registration identifiers are persisted in this slice.
