@@ -35,6 +35,11 @@ type ProofDecision =
   | "parallel_guard_conflicted"
   | "parallel_guard_not_ready";
 
+const ExitCode = {
+  Success: 0,
+  Failure: 1,
+} as const;
+
 function deriveProof(snapshot: RuntimeSnapshot): {
   ok: boolean;
   state: ProofState;
@@ -158,11 +163,14 @@ function resolveProofExitCode(
   payload: ReturnType<typeof serializeProofPayload>,
   enforceProofGate: boolean,
 ): number {
+  // Proof-mode reporting is intentionally fail-open so operators can always
+  // inspect blocked/conflicted/not-ready payloads and briefs.
   if (!enforceProofGate) {
-    return 0;
+    return ExitCode.Success;
   }
 
-  return payload.proof.ok ? 0 : 1;
+  // Proof-gate is explicit fail-closed policy enforcement.
+  return payload.proof.ok ? ExitCode.Success : ExitCode.Failure;
 }
 
 export async function runStatusCommand(
@@ -241,6 +249,8 @@ export async function runStatusCommand(
   };
 
   if (options.mode === "proof-json" || options.mode === "proof-text") {
+    // Render state first (JSON payload or operator brief), enforce policy second.
+    // This guarantees proof payload/brief visibility regardless of proof.ok.
     const payload = serializeProofPayload(runtimeSnapshot);
 
     if (options.mode === "proof-json") {
@@ -292,5 +302,7 @@ export async function runStatusCommand(
     `- health: ${health.ok ? `ok (${health.status ?? 200})` : (health.error ?? "failed")}`,
   );
 
-  return supervisorAlive && health.ok && managedChildAlive && managedPortOwner ? 0 : 1;
+  return supervisorAlive && health.ok && managedChildAlive && managedPortOwner
+    ? ExitCode.Success
+    : ExitCode.Failure;
 }

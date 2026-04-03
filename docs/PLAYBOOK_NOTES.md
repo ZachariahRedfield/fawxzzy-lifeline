@@ -24,6 +24,8 @@ Link related pull requests whenever possible.
   - Extended deterministic status verification to assert additive-safe proof payload emission on both success and enforced-failure paths.
 - Pattern:
   - Serialize proof state first, apply enforcement exit policy second.
+- Rule:
+  - Proof-mode rendering is invariant; enforcement changes exit code only and never mutates or suppresses payload/brief shape.
 - Failure mode addressed:
   - Short-circuiting unhealthy proof states into generic CLI failure output can drop the proof contract and incorrectly force non-zero exits for operator-facing proof status.
 - WHY it changed:
