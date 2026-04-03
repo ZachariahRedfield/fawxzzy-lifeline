@@ -53,19 +53,31 @@ jobs:
           path: dist
           if-no-files-found: error
 
+  deterministic-suite-matrix:
+    runs-on: ubuntu-latest
+    needs: validate
+    outputs:
+      suites: ${{ steps.suites.outputs.suites }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine deterministic suites
+        id: suites
+        run: |
+          suites_json=$(node -e "const suites=require('./scripts/test-suites.json'); process.stdout.write(JSON.stringify(Object.keys(suites)));")
+          echo "suites=$suites_json" >> "$GITHUB_OUTPUT"
+
   deterministic-suites:
     name: deterministic-suite (${{ matrix.suite }})
     runs-on: ubuntu-latest
-    needs: validate
+    needs:
+      - validate
+      - deterministic-suite-matrix
     strategy:
       fail-fast: false
       matrix:
-        suite:
-          - contracts
-          - core
-          - commands
-          - utilities
-          - examples
+        suite: ${{ fromJson(needs.deterministic-suite-matrix.outputs.suites) }}
 
     steps:
       - name: Checkout
