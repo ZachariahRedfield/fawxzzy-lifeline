@@ -90,6 +90,18 @@ for (const port of invalidPorts) {
   assertIncludesIssue(result.issues, 'port', 'must be an integer between 1 and 65535');
 }
 
+const validLowestPort = validateAppManifest({
+  ...makeValidManifest(),
+  port: 1,
+});
+assertExactIssues(validLowestPort.issues, []);
+
+const validHighestPort = validateAppManifest({
+  ...makeValidManifest(),
+  port: 65535,
+});
+assertExactIssues(validHighestPort.issues, []);
+
 const legacyRequired = validateAppManifest({
   ...makeValidManifest(),
   env: {
@@ -185,6 +197,15 @@ assert(
   partialDefaultsWithoutRunnableFields.manifest === undefined,
   'Expected partial validation without runnable fields to report no issues and no runnable manifest payload.',
 );
+
+const partialWithLegacyRequired = validatePartialManifest({
+  env: {
+    required: ['LEGACY_KEY'],
+  },
+});
+assertExactIssues(partialWithLegacyRequired.issues, [
+  { path: 'env.required', message: 'has been renamed to env.requiredKeys' },
+]);
 
 const partialDefaultsWithRunnableFields = validatePartialManifest({
   ...makeValidManifest(),
