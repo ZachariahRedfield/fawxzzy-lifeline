@@ -32,6 +32,10 @@ try {
   assert(path.isAbsolute(envResolution), `expected resolved env path to be absolute, received ${envResolution}`);
   assert(path.isAbsolute(explicitResolution), `expected resolved explicit path to be absolute, received ${explicitResolution}`);
 
+  delete process.env.LIFELINE_PLAYBOOK_PATH;
+  const noPathResolution = await resolvePlaybookPath(undefined);
+  assert(noPathResolution === undefined, `expected undefined with no explicit/env path, received ${noPathResolution}`);
+
   console.log("resolvePlaybookPath deterministic precedence verification passed.");
 } finally {
   if (originalEnv === undefined) {

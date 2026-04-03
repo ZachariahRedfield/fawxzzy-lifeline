@@ -134,6 +134,33 @@ try {
     `expected runtime object to remain valid after merge+validation, received ${JSON.stringify(mergedResult.resolvedManifest.runtime)}`,
   );
 
+  const envModeOnlyManifestPath = path.join(tempRoot, "env-mode-only.yml");
+  await writeFile(
+    envModeOnlyManifestPath,
+    [
+      "name: env-default-required-keys",
+      "archetype: node-web",
+      "repo: https://example.com/repo.git",
+      "branch: main",
+      "env:",
+      "  mode: inline",
+      "deploy:",
+      "  strategy: restart",
+    ].join("\n"),
+    "utf8",
+  );
+
+  const envModeOnlyResult = await resolveManifestConfig({
+    manifestPath: envModeOnlyManifestPath,
+    playbookPath,
+  });
+
+  assert(
+    envModeOnlyResult.resolvedManifest.env.requiredKeys.length === 1 &&
+      envModeOnlyResult.resolvedManifest.env.requiredKeys[0] === "FROM_DEFAULTS",
+    `expected defaults env.requiredKeys to persist when manifest only sets env.mode, received ${JSON.stringify(envModeOnlyResult.resolvedManifest.env.requiredKeys)}`,
+  );
+
   const missingArchetypeManifestPath = path.join(tempRoot, "missing-archetype.yml");
   await writeFile(
     missingArchetypeManifestPath,
@@ -161,11 +188,7 @@ try {
     [
       "name: invalid-resolved",
       "archetype: node-web",
-      "repo: https://example.com/repo.git",
       "branch: main",
-      "env:",
-      "  requiredKeys:",
-      "    - STILL_INVALID_BECAUSE_MODE_IS_MISSING_IN_MERGED_RESULT",
     ].join("\n"),
     "utf8",
   );
@@ -175,6 +198,7 @@ try {
     () =>
       resolveManifestConfig({
         manifestPath: invalidResolvedManifestPath,
+        playbookPath,
       }),
     "Resolved config is incomplete or invalid",
   );
