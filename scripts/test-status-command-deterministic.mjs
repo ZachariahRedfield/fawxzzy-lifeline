@@ -17,6 +17,11 @@ function assert(condition, message) {
   }
 }
 
+function assertIncludesLine(output, line, message) {
+  const lines = output.trimEnd().split("\n");
+  assert(lines.includes(line), `${message}; expected line ${JSON.stringify(line)}, got ${JSON.stringify(lines)}`);
+}
+
 function runCli(args, { cwd, allowFailure = false } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn("node", [cliPath, ...args], {
@@ -224,14 +229,26 @@ try {
   const stoppedResult = await runCli(["status", stoppedApp], { cwd: tempRoot, allowFailure: true });
   assert(stoppedResult.code === 1, `stopped: expected non-zero exit, got ${stoppedResult.code}`);
   assert(stoppedResult.stderr.trim() === "", `stopped: expected empty stderr, got ${JSON.stringify(stoppedResult.stderr)}`);
-  assert(stoppedResult.stdout.includes(`App ${stoppedApp} is stopped.`), "stopped: missing status summary line");
-  assert(stoppedResult.stdout.includes("- supervisor: stopped"), "stopped: missing supervisor line");
-  assert(stoppedResult.stdout.includes("- portOwner: none"), "stopped: missing portOwner none line");
-  assert(
-    stoppedResult.stdout.includes(`- healthcheck: http://127.0.0.1:${stoppedPort}/healthz`),
+  assertIncludesLine(stoppedResult.stdout, `App ${stoppedApp} is stopped.`, "stopped: missing status summary line");
+  assertIncludesLine(
+    stoppedResult.stdout,
+    `- supervisor: stopped (pid ${makeDeadPidCandidate(process.pid)})`,
+    "stopped: missing supervisor line",
+  );
+  assertIncludesLine(stoppedResult.stdout, "- child: stopped", "stopped: missing child line");
+  assertIncludesLine(stoppedResult.stdout, "- wrapper: stopped", "stopped: missing wrapper line");
+  assertIncludesLine(stoppedResult.stdout, "- listener: unknown/stopped", "stopped: missing listener line");
+  assertIncludesLine(stoppedResult.stdout, "- portOwner: none", "stopped: missing portOwner none line");
+  assertIncludesLine(
+    stoppedResult.stdout,
+    `- healthcheck: http://127.0.0.1:${stoppedPort}/healthz`,
     "stopped: missing healthcheck summary line",
   );
-  assert(stoppedResult.stdout.includes("- health: managed app process not running"), "stopped: missing health line");
+  assertIncludesLine(
+    stoppedResult.stdout,
+    "- health: managed app process not running",
+    "stopped: missing health line",
+  );
 
   const runningApp = "status-running-deterministic";
   const runningPort = await getFreePort();
@@ -252,14 +269,15 @@ try {
   const runningResult = await runCli(["status", runningApp], { cwd: tempRoot, allowFailure: true });
   assert(runningResult.code === 0, `running: expected exit 0, got ${runningResult.code}`);
   assert(runningResult.stderr.trim() === "", `running: expected empty stderr, got ${JSON.stringify(runningResult.stderr)}`);
-  assert(runningResult.stdout.includes(`App ${runningApp} is running.`), "running: missing status line");
-  assert(
-    runningResult.stdout.includes(`- supervisor: alive (pid ${process.pid})`),
+  assertIncludesLine(runningResult.stdout, `App ${runningApp} is running.`, "running: missing status line");
+  assertIncludesLine(
+    runningResult.stdout,
+    `- supervisor: alive (pid ${process.pid})`,
     "running: missing supervisor-alive summary",
   );
-  assert(runningResult.stdout.includes(`- port: ${runningPort}`), "running: missing port line");
-  assert(runningResult.stdout.includes("- health: ok (200)"), "running: missing health line");
-  assert(runningResult.stdout.includes(`- portOwner: pid ${runningServer.pid}`), "running: missing portOwner line");
+  assertIncludesLine(runningResult.stdout, `- port: ${runningPort}`, "running: missing port line");
+  assertIncludesLine(runningResult.stdout, "- health: ok (200)", "running: missing health line");
+  assertIncludesLine(runningResult.stdout, `- portOwner: pid ${runningServer.pid}`, "running: missing portOwner line");
 
   const blockedApp = "status-blocked-deterministic";
   const blockedPort = await getFreePort();
@@ -281,17 +299,20 @@ try {
   const blockedResult = await runCli(["status", blockedApp], { cwd: tempRoot, allowFailure: true });
   assert(blockedResult.code === 1, `blocked: expected non-zero exit, got ${blockedResult.code}`);
   assert(blockedResult.stderr.trim() === "", `blocked: expected empty stderr, got ${JSON.stringify(blockedResult.stderr)}`);
-  assert(blockedResult.stdout.includes(`App ${blockedApp} is blocked.`), "blocked: missing status line");
-  assert(
-    blockedResult.stdout.includes(`- supervisor: stopped (pid ${deadSupervisorPid})`),
+  assertIncludesLine(blockedResult.stdout, `App ${blockedApp} is blocked.`, "blocked: missing status line");
+  assertIncludesLine(
+    blockedResult.stdout,
+    `- supervisor: stopped (pid ${deadSupervisorPid})`,
     "blocked: missing supervisor stopped summary",
   );
-  assert(
-    blockedResult.stdout.includes(`- blockedReason: port ${blockedPort} occupied by pid ${blockedServer.pid}`),
+  assertIncludesLine(
+    blockedResult.stdout,
+    `- blockedReason: port ${blockedPort} occupied by pid ${blockedServer.pid}`,
     "blocked: missing blockedReason summary",
   );
-  assert(
-    blockedResult.stdout.includes(`- portOwner: pid ${blockedServer.pid}`),
+  assertIncludesLine(
+    blockedResult.stdout,
+    `- portOwner: pid ${blockedServer.pid}`,
     "blocked: missing portOwner summary",
   );
 

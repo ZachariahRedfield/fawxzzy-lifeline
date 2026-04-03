@@ -109,6 +109,10 @@ try {
     missingLogs.stdout.trim() === `No logs found for app ${missingLogsApp} at ${missingLogPath}.`,
     `missing-log-file: expected exact no-logs message, got ${JSON.stringify(missingLogs.stdout)}`,
   );
+  assert(
+    missingLogs.stdout === `No logs found for app ${missingLogsApp} at ${missingLogPath}.\n`,
+    `missing-log-file: expected deterministic newline contract, got ${JSON.stringify(missingLogs.stdout)}`,
+  );
 
   const existingLogsApp = "logs-existing-file-deterministic";
   const existingLogPath = path.join(tempRoot, ".lifeline", "logs", `${existingLogsApp}.log`);
