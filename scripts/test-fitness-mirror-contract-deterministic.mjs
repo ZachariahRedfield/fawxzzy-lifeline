@@ -60,6 +60,20 @@ assertIncludesIssue(
   'expected top-level keys: archetype, deploy, healthcheckPath, name, port',
 );
 
+const missingDeploy = validateFitnessMirrorManifest({
+  name: 'fitness',
+  archetype: 'node-web',
+  port: 4301,
+  healthcheckPath: '/login',
+});
+assertExactIssues(missingDeploy, [
+  {
+    path: '$',
+    message: 'expected top-level keys: archetype, deploy, healthcheckPath, name, port',
+  },
+  { path: 'deploy', message: 'must be an object' },
+]);
+
 const wrongFieldValues = validateFitnessMirrorManifest({
   ...makeValidMirror(),
   name: 'fitness-mirror',
