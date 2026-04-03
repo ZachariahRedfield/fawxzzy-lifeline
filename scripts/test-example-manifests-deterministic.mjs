@@ -16,8 +16,8 @@ function assert(condition, message) {
   }
 }
 
-function runValidate(manifestPath, cwd = repoRoot) {
-  const result = spawnSync("node", [cliPath, "validate", manifestPath], {
+function runNode(args, cwd = repoRoot) {
+  const result = spawnSync("node", args, {
     cwd,
     encoding: "utf8",
   });
@@ -28,13 +28,17 @@ function runValidate(manifestPath, cwd = repoRoot) {
   };
 }
 
-function assertValidateSuccess(result, label) {
-  assert(result.status === 0, `${label} validate failed:\n${result.output}`);
+function runValidate(manifestPath, cwd = repoRoot) {
+  return runNode([cliPath, "validate", manifestPath], cwd);
+}
+
+function assertSuccess(result, label) {
+  assert(result.status === 0, `${label} failed:\n${result.output}`);
 }
 
 function assertAll(output, checks) {
   for (const check of checks) {
-    assert(output.includes(check), `Missing expected output marker \"${check}\".\n${output}`);
+    assert(output.includes(check), `Missing expected output marker "${check}".\n${output}`);
   }
 }
 
@@ -44,8 +48,8 @@ const fitnessAbsolutePath = resolve(repoRoot, fitnessRelativePath);
 const fitnessRelative = runValidate(fitnessRelativePath, repoRoot);
 const fitnessAbsolute = runValidate(fitnessAbsolutePath, externalCwd);
 
-assertValidateSuccess(fitnessRelative, "fitness relative path");
-assertValidateSuccess(fitnessAbsolute, "fitness absolute path");
+assertSuccess(fitnessRelative, "fitness relative path validate");
+assertSuccess(fitnessAbsolute, "fitness absolute path validate");
 
 assertAll(fitnessRelative.output, [
   "Fitness mirror manifest is valid",
@@ -56,14 +60,18 @@ assertAll(fitnessAbsolute.output, [
   "- boundary: fitness manifest mirror",
 ]);
 
+const mirrorValidatorRelative = runNode(["scripts/validate-fitness-mirror.mjs"], repoRoot);
+assertSuccess(mirrorValidatorRelative, "fitness mirror validator (relative invocation)");
+assertAll(mirrorValidatorRelative.output, ["Fitness mirror validation passed"]);
+
 const playbookRelativePath = "examples/playbook-ui.lifeline.yml";
 const playbookAbsolutePath = resolve(repoRoot, playbookRelativePath);
 
 const playbookRelative = runValidate(playbookRelativePath, repoRoot);
 const playbookAbsolute = runValidate(playbookAbsolutePath, externalCwd);
 
-assertValidateSuccess(playbookRelative, "playbook-ui relative path");
-assertValidateSuccess(playbookAbsolute, "playbook-ui absolute path");
+assertSuccess(playbookRelative, "playbook-ui relative path validate");
+assertSuccess(playbookAbsolute, "playbook-ui absolute path validate");
 
 for (const output of [playbookRelative.output, playbookAbsolute.output]) {
   assertAll(output, [
