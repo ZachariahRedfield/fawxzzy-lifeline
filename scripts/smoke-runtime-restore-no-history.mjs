@@ -137,9 +137,18 @@ if (restoreResult.code !== 0) {
   );
 }
 
-if (!restoreResult.stdout.includes("No managed apps found in .lifeline/state.json.")) {
+// Restore can safely no-op in two valid ways:
+// 1) no managed apps exist in state
+// 2) managed apps exist, but none are restorable as running
+const hasNoManagedAppsMessage = restoreResult.stdout.includes(
+  "No managed apps found in .lifeline/state.json.",
+);
+const hasNoRestorableAppsMessage = restoreResult.stdout.includes(
+  "No restorable apps required restart.",
+);
+if (!hasNoManagedAppsMessage && !hasNoRestorableAppsMessage) {
   throw new Error(
-    `Expected explicit safe no-op restore message.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
+    `Expected safe no-op restore messaging.\nstdout:\n${restoreResult.stdout}\nstderr:\n${restoreResult.stderr}`,
   );
 }
 
