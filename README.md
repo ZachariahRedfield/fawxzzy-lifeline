@@ -85,7 +85,7 @@ Resolution is intentionally small and explicit:
 2. apply manifest values on top
 3. explicit manifest values always win
 
-Lifeline only merges known top-level manifest fields plus the nested `env` and `deploy` sections. It does not perform arbitrary deep-merge magic.
+Lifeline only merges known top-level manifest fields plus the nested `env`, `deploy`, and `runtime` sections. It does not perform arbitrary deep-merge magic.
 Playbook archetype exports are sparse optional default bundles. They may omit any app-default field (`installCommand`, `buildCommand`, `startCommand`, `healthcheckPath`, `env`, `deploy`, `port`), and missing runtime requirements must then come from explicit manifest values.
 
 ## Validation and resolution behavior

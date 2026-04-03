@@ -8,6 +8,14 @@ function assert(condition, message) {
   }
 }
 
+function parseStringLiteralUnion(source, typeName) {
+  const match = source.match(new RegExp(`type ${typeName} = ([^;]+);`));
+  assert(match, `Could not find ${typeName} union in startup contract source.`);
+  const values = [...match[1].matchAll(/"([^"]+)"/g)].map((entry) => entry[1]);
+  assert(values.length > 0, `${typeName} union appears empty.`);
+  return values;
+}
+
 async function main() {
   const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -21,6 +29,7 @@ async function main() {
   const scope = 'machine-local';
   const restoreEntrypoint = 'lifeline restore';
   const backendStatus = 'not-installed';
+  const startupIntents = parseStringLiteralUnion(startupSource, 'StartupIntent');
 
   for (const action of actions) {
     assert(
@@ -54,7 +63,8 @@ async function main() {
   }
 
   assert(
-    startupSource.includes(`backendStatus: "${backendStatus}"`) || startupSource.includes(`backendStatus': '${backendStatus}'`),
+    startupSource.includes(`backendStatus: "${backendStatus}"`) ||
+      startupSource.includes(`backendStatus': '${backendStatus}'`),
     `startup-contract.ts is expected to persist backendStatus \`${backendStatus}\`.`,
   );
   assert(
@@ -78,14 +88,16 @@ async function main() {
     );
   }
 
-  assert(
-    startupSource.includes('type StartupIntent = "enabled" | "disabled"'),
-    'startup-contract.ts is expected to define enabled/disabled startup intent union.',
-  );
+  for (const intent of startupIntents) {
+    assert(
+      startupDocs.includes(`\`${intent}\``) || startupDocs.includes(intent),
+      `docs/startup-contract.md must document startup intent value \`${intent}\`.`,
+    );
+  }
 
   assert(
-    startupDocs.includes('enabled') && startupDocs.includes('disabled'),
-    'docs/startup-contract.md must document enabled/disabled startup intent semantics.',
+    readme.includes('mechanism (`contract-only`)') || readme.includes('mechanism (\`contract-only\`)'),
+    'README.md must document startup status mechanism contract value contract-only.',
   );
 
   console.log('Doc/code startup contract parity deterministic verification passed.');

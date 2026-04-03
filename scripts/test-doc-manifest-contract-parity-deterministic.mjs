@@ -23,17 +23,25 @@ function parseConstArray(source, constName) {
   return values;
 }
 
+function parseStringConst(source, constName) {
+  const match = source.match(new RegExp(`${constName}\\s*=\\s*"([^"]+)"`));
+  assert(match, `Could not read ${constName} from source.`);
+  return match[1];
+}
+
 async function main() {
   const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
   const [
     manifestContractSource,
     playbookExportsSource,
+    resolveConfigSource,
     manifestDocs,
     readme,
   ] = await Promise.all([
     readFile(path.join(repoRoot, 'src/contracts/app-manifest.ts'), 'utf8'),
     readFile(path.join(repoRoot, 'src/core/load-playbook-exports.ts'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/core/resolve-config.ts'), 'utf8'),
     readFile(path.join(repoRoot, 'docs/contracts/app-manifest.md'), 'utf8'),
     readFile(path.join(repoRoot, 'README.md'), 'utf8'),
   ]);
@@ -85,22 +93,22 @@ async function main() {
     'docs/contracts/app-manifest.md supported archetypes list drifted from source constants ordering/content.',
   );
 
+  const supportedSchemaVersionMatch = playbookExportsSource.match(
+    /SUPPORTED_PLAYBOOK_SCHEMA_VERSION\s*=\s*(\d+)/,
+  );
   assert(
-    /SUPPORTED_PLAYBOOK_SCHEMA_VERSION\s*=\s*1/.test(playbookExportsSource),
-    'Expected SUPPORTED_PLAYBOOK_SCHEMA_VERSION constant to be 1 in load-playbook-exports source.',
+    supportedSchemaVersionMatch,
+    'Could not read SUPPORTED_PLAYBOOK_SCHEMA_VERSION from load-playbook-exports source.',
   );
 
-  const canonicalFamilyMatch = playbookExportsSource.match(
-    /CANONICAL_PLAYBOOK_EXPORT_FAMILY\s*=\s*"([^"]+)"/,
+  const canonicalFamily = parseStringConst(
+    playbookExportsSource,
+    'CANONICAL_PLAYBOOK_EXPORT_FAMILY',
   );
-  const legacyFamilyMatch = playbookExportsSource.match(
-    /LEGACY_PLAYBOOK_EXPORT_FAMILY\s*=\s*"([^"]+)"/,
+  const legacyFamily = parseStringConst(
+    playbookExportsSource,
+    'LEGACY_PLAYBOOK_EXPORT_FAMILY',
   );
-  assert(canonicalFamilyMatch, 'Could not read canonical Playbook export family constant.');
-  assert(legacyFamilyMatch, 'Could not read legacy Playbook export family constant.');
-
-  const canonicalFamily = canonicalFamilyMatch[1];
-  const legacyFamily = legacyFamilyMatch[1];
 
   for (const docSurface of [manifestDocs, readme]) {
     assert(
@@ -108,7 +116,8 @@ async function main() {
       'Playbook export docs must state schemaVersion/version compatibility behavior.',
     );
     assert(
-      docSurface.includes('schemaVersion') && (docSurface.includes('takes precedence') || docSurface.includes('is used')),
+      docSurface.includes('schemaVersion') &&
+        (docSurface.includes('takes precedence') || docSurface.includes('is used')),
       'Playbook export docs must state schemaVersion precedence/selection over version.',
     );
     assert(
@@ -122,8 +131,26 @@ async function main() {
   }
 
   assert(
-    new RegExp(`normalize(?:s|d)?.*\`${escapeRegExp(canonicalFamily)}\``, 'i').test(manifestDocs),
+    new RegExp(`normalize(?:s|d)?.*\`${escapeRegExp(canonicalFamily)}\``, 'i').test(
+      manifestDocs,
+    ),
     'docs/contracts/app-manifest.md must state normalization to canonical export family.',
+  );
+
+  assert(
+    /if \(defaults\?\.runtime \|\| isRecord\(manifest\.runtime\)\)/.test(
+      resolveConfigSource,
+    ),
+    'resolve-config.ts no longer shows explicit runtime merge behavior; update parity test expectations.',
+  );
+
+  assert(
+    /nested `env` and `deploy` sections/.test(readme) === false,
+    'README.md merge-precedence section is stale: it must include runtime section merge behavior.',
+  );
+  assert(
+    readme.includes('nested `env`, `deploy`, and `runtime` sections'),
+    'README.md must document runtime merge behavior to match resolve-config contract.',
   );
 
   console.log('Doc/code manifest + Playbook export contract parity deterministic verification passed.');
