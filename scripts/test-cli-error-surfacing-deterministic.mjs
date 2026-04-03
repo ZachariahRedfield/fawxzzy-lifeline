@@ -51,6 +51,10 @@ assert(
   typedErrorResult.stderr.trim() === "Missing value for --playbook-path.",
   `Expected typed LifelineError path to surface only message text.\nstdout:\n${typedErrorResult.stdout}\nstderr:\n${typedErrorResult.stderr}`,
 );
+assert(
+  typedErrorResult.stdout.trim() === "",
+  `Expected typed LifelineError path to avoid stdout noise.\nstdout:\n${typedErrorResult.stdout}\nstderr:\n${typedErrorResult.stderr}`,
+);
 
 const harnessRoot = await mkdtemp(path.join(os.tmpdir(), "lifeline-cli-error-surfacing-"));
 const harnessPath = path.join(harnessRoot, "unexpected-error-harness.mjs");
@@ -83,6 +87,10 @@ assert(
 assert(
   unexpectedResult.stderr.trim() === "Unexpected error: forced unexpected failure",
   `Expected unexpected error path to include Unexpected error prefix.\nstdout:\n${unexpectedResult.stdout}\nstderr:\n${unexpectedResult.stderr}`,
+);
+assert(
+  unexpectedResult.stdout.trim() === "",
+  `Expected unexpected error path to avoid stdout noise.\nstdout:\n${unexpectedResult.stdout}\nstderr:\n${unexpectedResult.stderr}`,
 );
 
 console.log("CLI error surfacing deterministic verification passed.");

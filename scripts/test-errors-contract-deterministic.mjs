@@ -27,6 +27,12 @@ assert(base.name === "LifelineError", `Expected LifelineError name, received ${b
 assert(base.code === "LIFELINE_ERROR", `Expected default LifelineError code, received ${base.code}.`);
 assert(base.message === "base failure", "LifelineError should preserve message text.");
 
+const customBase = new LifelineError("custom failure", "CUSTOM_CODE");
+assert(
+  customBase.code === "CUSTOM_CODE",
+  `Expected LifelineError to preserve custom code, received ${customBase.code}.`,
+);
+
 const contractCases = [
   {
     label: "ManifestLoadError",
@@ -64,6 +70,10 @@ for (const testCase of contractCases) {
   assert(
     testCase.instance.code === testCase.expectedCode,
     `${testCase.label} code mismatch. Expected ${testCase.expectedCode}, received ${testCase.instance.code}.`,
+  );
+  assert(
+    testCase.instance.message.endsWith("failed"),
+    `${testCase.label} should preserve error message text. Received ${testCase.instance.message}.`,
   );
 }
 
