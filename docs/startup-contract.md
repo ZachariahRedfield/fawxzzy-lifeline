@@ -1,6 +1,6 @@
-# Startup contract (merged Wave 2)
+# Startup contract (Wave 2 on current main)
 
-Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior. This document tracks the contract boundary and current runtime behavior, including the current Windows fallback path.
+Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior. This document tracks the contract boundary and current runtime behavior, including current Windows backend behavior and unsupported-platform fallback behavior.
 
 ## Scope
 
@@ -36,13 +36,13 @@ Startup enabled: <yes|no>
 - detail: <backend/status detail>
 ```
 
-## Contract-only vs real backend status
+## Backend status: contract seam + platform selection
 
-Current default runtime status is **contract-only**. That means:
+Current runtime behavior is split between a real platform backend on Windows and a contract-only unsupported fallback on platforms without a registered backend.
 
-- the CLI and persisted startup metadata are real and deterministic now
+- the CLI and persisted startup metadata are real and deterministic
 - backend seam calls are real (`install`, `uninstall`, `inspect`)
-- the default selected backend may still be `unsupported` for a platform
+- backend selection is platform-dependent at runtime
 
 Contract behavior split:
 
@@ -54,14 +54,24 @@ When the selected backend is unsupported, backend readiness resolves as `unsuppo
 
 Once a platform backend lands, this document and deterministic startup verification must be updated in the same change set to keep behavior discoverable.
 
-## Windows status (current)
+## Windows backend status (current)
 
-As of April 4, 2026, default `win32` backend resolution remains contract-only unsupported in normal CLI flow. Lifeline therefore does **not** currently guarantee Task Scheduler registration from `lifeline startup enable`.
+As of April 4, 2026, `win32` resolves to the `windows-task-scheduler` backend in normal CLI flow.
 
-Expected unsupported detail shape:
+Expected behavior:
 
-- `No startup installer backend is available on win32 yet.`
-- `Intent can still be recorded for future backend availability.`
+- `startup status` reports mechanism `windows-task-scheduler`.
+- `startup enable` attempts Task Scheduler registration for `lifeline restore` at user logon.
+- `startup disable` attempts to remove the same task.
+- if `schtasks` is unavailable, operations surface explicit `unsupported` detail and do not claim successful registration.
+
+## Unsupported platform behavior (current)
+
+Platforms without a configured backend (for example `linux` and `darwin` today) resolve to the `unsupported` contract backend:
+
+- `startup status` reports mechanism `contract-only`.
+- `startup enable`/`startup disable` keep the contract/state flow deterministic while returning explicit unsupported detail.
+- intent persistence remains allowed so desired startup state is retained for future backend availability.
 
 ## Restore entrypoint wiring
 
@@ -82,4 +92,4 @@ No platform-specific registration identifiers are persisted in this slice.
 
 ## Backend contract expectation
 
-Future platform installers must plug into this contract, not bypass it. Backends should read the contract intent and apply OS-specific wiring while preserving the contract's machine-local scope and restore-entrypoint target.
+Future non-Windows installers (for example `systemd` and `launchd`) must plug into this contract, not bypass it. Backends should read the contract intent and apply OS-specific wiring while preserving the contract's machine-local scope and restore-entrypoint target.

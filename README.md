@@ -136,14 +136,15 @@ pnpm lifeline startup enable --dry-run
 pnpm lifeline startup disable --dry-run
 ```
 
-Current merged Wave 2 startup-contract behavior:
+Current startup behavior on `main`:
 
 - `startup enable` calls backend seam `install` and persists intent to enabled in `.lifeline/startup.json`.
 - `startup disable` calls backend seam `uninstall` and persists intent to disabled in `.lifeline/startup.json`.
-- `startup status` reports scope, canonical restore entrypoint (`lifeline restore`), mechanism (`contract-only`), and backend readiness from seam inspection.
-- `--dry-run` prints the planned startup action without mutating `.lifeline/startup.json` or performing backend install/uninstall writes.
-- Current Windows (`win32`) behavior is contract-only/unsupported in default CLI backend selection, so Lifeline does not currently guarantee Task Scheduler entries from `startup enable`.
-- OS-specific installer backends (Task Scheduler/systemd/launchd) are intentionally deferred and must plug in behind this contract.
+- `startup status` reports scope, canonical restore entrypoint (`lifeline restore`), active backend mechanism, and backend readiness from seam inspection.
+- `startup enable --dry-run` and `startup disable --dry-run` call backend dry-run planning and print the plan without mutating `.lifeline/startup.json`.
+- Current Windows (`win32`) behavior selects the `windows-task-scheduler` backend. Task registration depends on `schtasks` availability and command success on the host machine.
+- Unsupported platforms currently resolve to the fallback `contract-only` backend with explicit detail (`No startup installer backend is available on <platform> yet.`), while still allowing intent to be recorded in Lifeline state.
+- Remaining deferred backends are non-Windows installers (for example `systemd` and `launchd`) and must plug in behind this same contract seam.
 
 Deterministic status output shape:
 
@@ -156,7 +157,7 @@ Startup enabled: <yes|no>
 - detail: <backend/status detail>
 ```
 
-For unsupported backends (including current default `win32` behavior as of April 4, 2026), status and mutation detail must remain explicit (for example, `No startup installer backend is available on win32 yet.`) so startup state is not tribal knowledge.
+For unsupported backends (for example current non-`win32` fallback behavior as of April 4, 2026), status and mutation detail must remain explicit (for example, `No startup installer backend is available on linux yet.`) so startup state is not tribal knowledge.
 
 ## Slim manifest example with Playbook defaults
 
@@ -325,4 +326,4 @@ Expected interaction with `restore` stays explicit: startup registration contrac
 
 ## Wave 1 notes
 
-Wave 1 added a supervisor-backed lifecycle plus restore semantics. Wave 2 currently adds a startup contract and CLI surface, with platform-specific installers deferred behind that seam.
+Wave 1 added a supervisor-backed lifecycle plus restore semantics. Wave 2 adds the startup contract/CLI surface plus a Windows Task Scheduler backend, with non-Windows installers still deferred behind the same seam.
