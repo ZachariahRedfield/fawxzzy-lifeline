@@ -28,6 +28,12 @@ export interface StartupBackend {
   uninstall(request: StartupBackendRequest): Promise<StartupBackendResult>;
 }
 
+type StartupBackendFactory = () => StartupBackend;
+
+export interface StartupBackendRegistry {
+  byPlatform: Partial<Record<RuntimePlatform, StartupBackendFactory>>;
+}
+
 function createUnsupportedBackend(platform: RuntimePlatform): StartupBackend {
   const detail = `No startup installer backend is available on ${platform} yet.`;
 
@@ -57,6 +63,7 @@ function createUnsupportedBackend(platform: RuntimePlatform): StartupBackend {
 export interface StartupBackendResolutionOptions {
   backend?: StartupBackend;
   platform?: RuntimePlatform;
+  registry?: StartupBackendRegistry;
 }
 
 export function resolveStartupBackend(options: StartupBackendResolutionOptions = {}): StartupBackend {
@@ -64,5 +71,11 @@ export function resolveStartupBackend(options: StartupBackendResolutionOptions =
     return options.backend;
   }
 
-  return createUnsupportedBackend(options.platform ?? process.platform);
+  const platform = options.platform ?? process.platform;
+  const backendFactory = options.registry?.byPlatform[platform];
+  if (backendFactory) {
+    return backendFactory();
+  }
+
+  return createUnsupportedBackend(platform);
 }

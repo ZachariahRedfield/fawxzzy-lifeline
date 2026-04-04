@@ -25,6 +25,14 @@ export interface StartupPlan {
   detail: string;
 }
 
+function buildStartupRequest(dryRun: boolean) {
+  return {
+    scope: "machine-local" as const,
+    restoreEntrypoint: "lifeline restore" as const,
+    dryRun,
+  };
+}
+
 interface StartupState {
   version: 1;
   scope: "machine-local";
@@ -127,11 +135,7 @@ export async function planStartupAction(
   action: "enable" | "disable",
   backend: StartupBackend = resolveStartupBackend(),
 ): Promise<StartupPlan> {
-  const request = {
-    scope: "machine-local" as const,
-    restoreEntrypoint: "lifeline restore" as const,
-    dryRun: true,
-  };
+  const request = buildStartupRequest(true);
 
   const preview = action === "enable" ? await backend.install(request) : await backend.uninstall(request);
 
@@ -142,6 +146,10 @@ export async function planStartupAction(
     backendStatus: preview.status,
     detail: preview.detail,
   };
+}
+
+export function createStartupMutationRequest() {
+  return buildStartupRequest(false);
 }
 
 export async function setStartupIntent(

@@ -1,4 +1,5 @@
 import {
+  createStartupMutationRequest,
   getStartupStatus,
   planStartupAction,
   setStartupIntent,
@@ -27,13 +28,13 @@ export async function runStartupCommand(
   }
 
   const dryRun = option === "--dry-run";
+  const backend = resolveStartupBackend();
   if (option && !dryRun) {
     console.error(`Unknown startup option: ${option}. Only --dry-run is supported.`);
     return 1;
   }
 
   if (action === "enable") {
-    const backend = resolveStartupBackend();
     const plan = await planStartupAction("enable", backend);
     if (dryRun) {
       console.log("Startup enable dry-run:");
@@ -44,11 +45,7 @@ export async function runStartupCommand(
       return 0;
     }
 
-    const backendResult = await backend.install({
-      scope: plan.scope,
-      restoreEntrypoint: plan.restoreEntrypoint,
-      dryRun: false,
-    });
+    const backendResult = await backend.install(createStartupMutationRequest());
     await setStartupIntent("enabled", backendResult.status);
     console.log("Startup intent enabled.");
     console.log(backendResult.detail);
@@ -56,7 +53,6 @@ export async function runStartupCommand(
   }
 
   if (action === "disable") {
-    const backend = resolveStartupBackend();
     const plan = await planStartupAction("disable", backend);
     if (dryRun) {
       console.log("Startup disable dry-run:");
@@ -67,11 +63,7 @@ export async function runStartupCommand(
       return 0;
     }
 
-    const backendResult = await backend.uninstall({
-      scope: plan.scope,
-      restoreEntrypoint: plan.restoreEntrypoint,
-      dryRun: false,
-    });
+    const backendResult = await backend.uninstall(createStartupMutationRequest());
     await setStartupIntent("disabled", backendResult.status);
     console.log("Startup intent disabled.");
     console.log(backendResult.detail);
@@ -83,7 +75,7 @@ export async function runStartupCommand(
       console.error("The --dry-run option is only valid with startup enable|disable.");
       return 1;
     }
-    return printStatus(resolveStartupBackend());
+    return printStatus(backend);
   }
 
   console.error(`Unknown startup action: ${action}. Use one of: enable, disable, status.`);

@@ -48,11 +48,51 @@ async function verifyInjectedBackendSelection() {
   assert(inspection.mechanism === 'deterministic-fake', `Expected fake mechanism, got ${inspection.mechanism}.`);
 }
 
+async function verifyRegistrySelectionAndFallback() {
+  const registryBackend = {
+    id: 'registry-backend',
+    capabilities: ['inspect', 'install', 'uninstall'],
+    inspect: async () => ({
+      supported: true,
+      status: 'installed',
+      mechanism: 'registry-backend',
+      detail: 'registry backend selected',
+    }),
+    install: async () => ({ status: 'installed', detail: 'ok' }),
+    uninstall: async () => ({ status: 'not-installed', detail: 'ok' }),
+  };
+
+  const selected = resolveStartupBackend({
+    platform: 'linux',
+    registry: {
+      byPlatform: {
+        linux: () => registryBackend,
+      },
+    },
+  });
+  const selectedInspection = await selected.inspect();
+  assert(selected.id === 'registry-backend', `Expected registry backend to be selected, got ${selected.id}.`);
+  assert(selectedInspection.mechanism === 'registry-backend', 'Expected registry inspection result.');
+
+  const fallback = resolveStartupBackend({
+    platform: 'darwin',
+    registry: {
+      byPlatform: {
+        linux: () => registryBackend,
+      },
+    },
+  });
+  const fallbackInspection = await fallback.inspect();
+  assert(fallback.id === 'unsupported', `Expected unsupported fallback backend, got ${fallback.id}.`);
+  assert(fallbackInspection.status === 'unsupported', `Expected unsupported fallback status, got ${fallbackInspection.status}.`);
+}
+
 async function main() {
   await verifyUnsupportedDefaultSelection('win32');
   await verifyUnsupportedDefaultSelection('linux');
   await verifyUnsupportedDefaultSelection('darwin');
   await verifyInjectedBackendSelection();
+  await verifyRegistrySelectionAndFallback();
   console.log('Deterministic startup backend selection verification passed.');
 }
 
