@@ -1,6 +1,8 @@
 export type StartupBackendStatus = "installed" | "not-installed" | "unsupported";
 export type RuntimePlatform = string;
 
+import { createWindowsTaskSchedulerBackend } from "./startup-backends/windows-task-scheduler.js";
+
 export interface StartupBackendInspection {
   supported: boolean;
   status: StartupBackendStatus;
@@ -52,5 +54,9 @@ function createUnsupportedBackend(platform: RuntimePlatform): StartupBackend {
 }
 
 export function resolveStartupBackend(platform: RuntimePlatform = process.platform): StartupBackend {
+  if (platform === "win32") {
+    return createWindowsTaskSchedulerBackend();
+  }
+
   return createUnsupportedBackend(platform);
 }
