@@ -1,15 +1,39 @@
 # Testing model
 
-Lifeline keeps test structure discoverable from the repo via two explicit layers:
+Lifeline uses two execution patterns so verification stays deterministic and discoverable from the repository:
 
-- **Smoke tests**: fixture-backed runtime flow checks.
-- **Deterministic suites**: contract/helper/command coverage registered in `scripts/test-suites.json`.
+- **Targeted runners** for focused debugging and repro.
+- **Suite runners** for grouped verification and CI-style execution.
 
-## Deterministic suite registry
+## Deterministic tests
 
-Source of truth: `scripts/test-suites.json`.
+Registry source of truth: `scripts/test-suites.json`.
+Runner entrypoint: `scripts/test-runner.mjs`.
 
-Current suites:
+### Targeted deterministic script run
+
+Run one deterministic script directly when you are debugging a single failure path:
+
+```bash
+node scripts/test-resolve-config-deterministic.mjs
+```
+
+### Grouped deterministic suite run
+
+Use the deterministic suite runner for grouped execution:
+
+```bash
+# list deterministic suites
+node scripts/test-runner.mjs list
+
+# run one deterministic suite
+node scripts/test-runner.mjs core
+
+# run every deterministic suite
+node scripts/test-runner.mjs all
+```
+
+Current deterministic suites in the registry:
 
 - `commands`
 - `contracts`
@@ -17,28 +41,43 @@ Current suites:
 - `examples`
 - `utilities`
 
-## Run deterministic suites
+## Smoke tests
 
-Use the deterministic test runner (`scripts/test-runner.mjs`):
+Registry source of truth: `scripts/smoke-suites.json`.
+Runner entrypoints:
+
+- Targeted smoke runner: `scripts/smoke-runner.mjs`
+- Grouped smoke suite runner: `scripts/smoke-suite-runner.mjs`
+
+### Targeted smoke scenario run
+
+Use the targeted smoke runner for one scenario:
 
 ```bash
-# list available deterministic suites
-node scripts/test-runner.mjs list
-
-# run one deterministic suite
-node scripts/test-runner.mjs run core
-
-# run all deterministic suites
-node scripts/test-runner.mjs run all
+node scripts/smoke-runner.mjs runtime restore-invalid-manifest-shape
 ```
 
-## Suite role vs smoke role
+### Grouped smoke suite run
 
-- Smoke tests prove runtime flows and fixture-backed end-to-end behavior.
-- Deterministic suites prove contracts, command behavior, and helper/runtime primitives.
+Use the smoke suite runner for grouped scenarios:
 
-## Docs summary
+```bash
+# list smoke suites
+node scripts/smoke-suite-runner.mjs list
 
-- **Rule:** Test structure should be discoverable from the repo, not tribal knowledge.
-- **Pattern:** Smoke tests prove runtime flows; deterministic suites prove contracts and helpers.
-- **Failure Mode:** Without docs parity, new coverage lands but nobody knows how to run or extend it consistently.
+# run one smoke suite
+node scripts/smoke-suite-runner.mjs runtime
+
+# run every smoke suite
+node scripts/smoke-suite-runner.mjs all
+```
+
+Current smoke suites in the registry:
+
+- `playbook`
+- `runtime`
+
+## Quick rule of thumb
+
+- **Use targeted runners** (`test-*.mjs` directly, `smoke-runner.mjs`) for debugging and narrow repro.
+- **Use suite runners** (`test-runner.mjs`, `smoke-suite-runner.mjs`) for grouped verification before merge and CI parity.

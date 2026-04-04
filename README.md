@@ -191,6 +191,8 @@ CI uses the same canonical Playbook verification path: `pnpm smoke:playbook`.
 
 ### Smoke execution modes
 
+For complete testing execution patterns (targeted vs grouped deterministic and smoke runs), see [docs/testing.md](docs/testing.md).
+
 Use the smoke runners with distinct intent:
 
 - **Single-scenario runs (`scripts/smoke-runner.mjs`)** are for debugging and targeted repro.
