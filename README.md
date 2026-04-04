@@ -143,8 +143,8 @@ Current merged Wave 2 startup-contract behavior:
 - `startup status` reports support, enabled intent, backend install status, scope, canonical restore entrypoint (`lifeline restore`), mechanism, and backend detail from seam inspection.
 - `--dry-run` prints the planned startup action without mutating `.lifeline/startup.json` or performing backend install/uninstall writes.
 - Current Windows (`win32`) behavior uses a real Task Scheduler backend (`windows-task-scheduler`) in default CLI backend selection.
-- Non-Windows platforms currently fall back to the unsupported contract backend (`contract-only`) with explicit status/detail output.
-- Linux/macOS startup installers (for example `systemd`/`launchd`) are intentionally deferred and must plug in behind this contract.
+- Current Linux (`linux`) behavior uses a real user-systemd backend (`systemd-user`) in default CLI backend selection.
+- Unsupported contract fallback (`contract-only`) is still used for platforms without a registered backend (for example, macOS/`darwin` and BSD variants).
 
 When the active backend is unsupported, startup status reports mechanism (`contract-only`) so fallback behavior stays explicit.
 
@@ -329,4 +329,4 @@ Expected interaction with `restore` stays explicit: startup registration contrac
 
 ## Wave 1 notes
 
-Wave 1 added a supervisor-backed lifecycle plus restore semantics. Wave 2 now includes both the startup contract/CLI surface and default `win32` Task Scheduler backend wiring; remaining deferred installers are Linux/macOS backends behind the same seam.
+Wave 1 added a supervisor-backed lifecycle plus restore semantics. Wave 2 now includes the startup contract/CLI surface plus default `win32` Task Scheduler and `linux` user-systemd backend wiring; remaining deferred installers are unregistered platforms (for example, macOS `launchd`) behind the same seam.

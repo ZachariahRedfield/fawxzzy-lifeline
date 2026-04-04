@@ -53,10 +53,7 @@ async function main() {
     statusOutput.includes('- restore entrypoint: lifeline restore'),
     'Expected startup status restore entrypoint to remain canonical.',
   );
-  assert(
-    statusOutput.includes('- mechanism: contract-only'),
-    'Expected startup status to report contract-only mechanism.',
-  );
+  assert(statusOutput.includes('- mechanism: '), 'Expected startup status to report mechanism line.');
 
   const disableOutput = await runLifeline(tempDir, 'startup', 'disable');
   assert(disableOutput.includes('Startup intent disabled.'), 'Expected startup disable confirmation.');

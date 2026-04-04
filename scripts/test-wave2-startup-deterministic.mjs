@@ -186,35 +186,120 @@ async function verifySeamInstallDisableStatusAndDryRun() {
   }
 }
 
-async function verifyUnsupportedBackendPath() {
+async function verifyLinuxBackendResolutionAndFallback() {
   await ensureBuiltCli();
   const startupBackendModule = await import(new URL('../dist/core/startup-backend.js', import.meta.url));
   const { resolveStartupBackend } = startupBackendModule;
-  const backend = resolveStartupBackend({ platform: 'linux' });
-  const inspection = await backend.inspect();
+
+  const linuxBackend = resolveStartupBackend({ platform: 'linux' });
+  assert(linuxBackend.id === 'systemd-user', `Expected linux backend to resolve to systemd-user, got ${linuxBackend.id}.`);
+
+  const freebsdBackend = resolveStartupBackend({ platform: 'freebsd' });
+  const fallbackInspection = await freebsdBackend.inspect();
+  assert(fallbackInspection.supported === false, 'Expected unsupported fallback backend to report supported=false.');
+  assert(fallbackInspection.mechanism === 'contract-only', `Expected contract-only mechanism, got ${fallbackInspection.mechanism}.`);
+  assert(
+    fallbackInspection.detail.includes('No startup installer backend is available on freebsd yet.'),
+    `Expected unsupported inspection detail to include platform name, got: ${fallbackInspection.detail}`,
+  );
+}
+
+async function verifySystemdBackendDeterministicBehavior() {
+  await ensureBuiltCli();
+
+  const { mkdtemp, readFile } = await import('node:fs/promises');
+  const startupBackendSystemdModule = await import(new URL('../dist/core/startup-backends/systemd.js', import.meta.url));
+  const { createSystemdUserBackend } = startupBackendSystemdModule;
+
+  const tempHome = await mkdtemp(path.join(os.tmpdir(), 'lifeline-systemd-backend-'));
+  const invoked = [];
+
+  const runner = async (args) => {
+    invoked.push(args);
+
+    if (args.join(' ') === '--user cat lifeline-restore.service') {
+      return { code: 1, stdout: '', stderr: 'Unit lifeline-restore.service could not be found.' };
+    }
+
+    if (args.join(' ') === '--user daemon-reload') {
+      return { code: 0, stdout: '', stderr: '' };
+    }
+
+    if (args.join(' ') === '--user enable --now lifeline-restore.service') {
+      return { code: 0, stdout: 'Created symlink.', stderr: '' };
+    }
+
+    if (args.join(' ') === '--user disable --now lifeline-restore.service') {
+      return { code: 0, stdout: 'Removed symlink.', stderr: '' };
+    }
+
+    throw new Error(`Unexpected systemctl invocation in deterministic test: ${args.join(' ')}`);
+  };
+
+  const backend = createSystemdUserBackend(runner, { homeDirectory: tempHome });
+
+  const dryRunInstall = await backend.install({
+    scope: 'machine-local',
+    restoreEntrypoint: 'lifeline restore',
+    dryRun: true,
+  });
+  assert(dryRunInstall.status === 'not-installed', `Expected dry-run install status not-installed, got ${dryRunInstall.status}.`);
+  assert(
+    dryRunInstall.detail.includes('would write user unit lifeline-restore.service'),
+    `Expected dry-run install detail to describe unit creation, got: ${dryRunInstall.detail}`,
+  );
+
   const installResult = await backend.install({
     scope: 'machine-local',
     restoreEntrypoint: 'lifeline restore',
     dryRun: false,
   });
+  assert(installResult.status === 'installed', `Expected install status installed, got ${installResult.status}.`);
+  const unitPath = path.join(tempHome, '.config', 'systemd', 'user', 'lifeline-restore.service');
+  const rawUnit = await readFile(unitPath, 'utf8');
+  assert(rawUnit.includes('ExecStart=lifeline restore'), `Expected installed unit file to keep canonical restore entrypoint.
+${rawUnit}`);
 
-  assert(inspection.supported === false, 'Expected linux unsupported backend path to report supported=false.');
-  assert(inspection.mechanism === 'contract-only', `Expected contract-only mechanism, got ${inspection.mechanism}.`);
+  const dryRunUninstall = await backend.uninstall({
+    scope: 'machine-local',
+    restoreEntrypoint: 'lifeline restore',
+    dryRun: true,
+  });
   assert(
-    inspection.detail.includes('No startup installer backend is available on linux yet.'),
-    `Expected unsupported inspection detail to be explicit, got: ${inspection.detail}`,
+    dryRunUninstall.detail.includes('user unit lifeline-restore.service is not present') ||
+      dryRunUninstall.detail.includes('would disable user unit lifeline-restore.service'),
+    `Expected dry-run uninstall detail to describe deterministic removal intent, got: ${dryRunUninstall.detail}`,
+  );
+
+  const uninstallResult = await backend.uninstall({
+    scope: 'machine-local',
+    restoreEntrypoint: 'lifeline restore',
+    dryRun: false,
+  });
+  assert(uninstallResult.status === 'not-installed', `Expected uninstall status not-installed, got ${uninstallResult.status}.`);
+
+  const invokedCommands = invoked.map((command) => command.join(' '));
+  assert(
+    invokedCommands.includes('--user daemon-reload') && invokedCommands.includes('--user enable --now lifeline-restore.service'),
+    `Expected install path to run daemon-reload and enable --now.
+commands:
+${invokedCommands.join('\n')}`,
   );
   assert(
-    installResult.detail.includes('Intent can still be recorded'),
-    `Expected unsupported install path to explain contract-only state persistence, got: ${installResult.detail}`,
+    invokedCommands.includes('--user disable --now lifeline-restore.service'),
+    `Expected uninstall path to run disable --now.
+commands:
+${invokedCommands.join('\n')}`,
   );
 }
+
 
 async function main() {
   await verifyRestoreEntrypointWiring();
   await verifyContractSurfaceWiring();
   await verifySeamInstallDisableStatusAndDryRun();
-  await verifyUnsupportedBackendPath();
+  await verifyLinuxBackendResolutionAndFallback();
+  await verifySystemdBackendDeterministicBehavior();
   console.log('Wave 2 startup deterministic verification passed.');
 }
 
