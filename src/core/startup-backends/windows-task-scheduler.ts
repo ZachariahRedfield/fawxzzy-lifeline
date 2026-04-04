@@ -8,6 +8,7 @@ import type {
 
 const TASK_NAME = "LifelineRestoreAtLogon";
 const TASK_MECHANISM = "windows-task-scheduler";
+const RESTORE_ENTRYPOINT = "lifeline restore";
 
 interface SchedulerCommandResult {
   code: number;
@@ -38,11 +39,11 @@ async function runSchtasks(args: string[]): Promise<SchedulerCommandResult> {
       stderr += String(chunk);
     });
 
-    child.on("error", () => {
+    child.on("error", (error) => {
       resolve({
-        code: 1,
+        code: -1,
         stdout: normalizeOutput(stdout),
-        stderr: normalizeOutput(stderr),
+        stderr: normalizeOutput(`Unable to execute schtasks: ${error.message}`),
       });
     });
 
@@ -58,11 +59,37 @@ async function runSchtasks(args: string[]): Promise<SchedulerCommandResult> {
 
 function matchesConfiguredTask(queryOutput: string): boolean {
   const normalized = queryOutput.toLowerCase();
-  return normalized.includes("lifeline restore") && normalized.includes(TASK_NAME.toLowerCase());
+  return (
+    normalized.includes(TASK_NAME.toLowerCase()) &&
+    normalized.includes(RESTORE_ENTRYPOINT)
+  );
 }
 
-async function inspectTask(runner: SchedulerRunner): Promise<StartupBackendInspection> {
-  const queryResult = await runner(["/Query", "/TN", TASK_NAME, "/V", "/FO", "LIST"]);
+function isSchedulerUnavailable(result: SchedulerCommandResult): boolean {
+  return result.code === -1;
+}
+
+async function inspectTask(
+  runner: SchedulerRunner,
+): Promise<StartupBackendInspection> {
+  const queryResult = await runner([
+    "/Query",
+    "/TN",
+    TASK_NAME,
+    "/V",
+    "/FO",
+    "LIST",
+  ]);
+
+  if (isSchedulerUnavailable(queryResult)) {
+    return {
+      supported: false,
+      status: "unsupported",
+      mechanism: TASK_MECHANISM,
+      detail:
+        "Windows Task Scheduler CLI is unavailable, so startup registration cannot be inspected.",
+    };
+  }
 
   if (queryResult.code !== 0) {
     return {
@@ -78,7 +105,7 @@ async function inspectTask(runner: SchedulerRunner): Promise<StartupBackendInspe
       supported: true,
       status: "not-installed",
       mechanism: TASK_MECHANISM,
-      detail: `Task ${TASK_NAME} exists but is not configured for the canonical restore entrypoint lifeline restore.`,
+      detail: `Task ${TASK_NAME} exists but is not configured for the canonical restore entrypoint ${RESTORE_ENTRYPOINT}.`,
     };
   }
 
@@ -86,30 +113,53 @@ async function inspectTask(runner: SchedulerRunner): Promise<StartupBackendInspe
     supported: true,
     status: "installed",
     mechanism: TASK_MECHANISM,
-    detail: `Task ${TASK_NAME} is installed and configured to execute lifeline restore at user logon.`,
+    detail: `Task ${TASK_NAME} is installed and configured to execute ${RESTORE_ENTRYPOINT} at user logon.`,
   };
 }
 
 function buildCreateTaskArgs(): string[] {
-  return ["/Create", "/TN", TASK_NAME, "/SC", "ONLOGON", "/TR", "lifeline restore", "/F"];
+  return [
+    "/Create",
+    "/TN",
+    TASK_NAME,
+    "/SC",
+    "ONLOGON",
+    "/TR",
+    RESTORE_ENTRYPOINT,
+    "/F",
+  ];
 }
 
-export function createWindowsTaskSchedulerBackend(runner: SchedulerRunner = runSchtasks): StartupBackend {
+export function createWindowsTaskSchedulerBackend(
+  runner: SchedulerRunner = runSchtasks,
+): StartupBackend {
   return {
     id: TASK_MECHANISM,
     inspect: async () => inspectTask(runner),
-    install: async (request: StartupBackendRequest): Promise<StartupBackendResult> => {
+    install: async (
+      request: StartupBackendRequest,
+    ): Promise<StartupBackendResult> => {
       if (request.dryRun) {
         return {
           status: "not-installed",
-          detail:
-            `Dry-run: would register Windows Task Scheduler task ${TASK_NAME} to run ${request.restoreEntrypoint} on user logon.`,
+          detail: `Dry-run: would register Windows Task Scheduler task ${TASK_NAME} to run ${request.restoreEntrypoint} on user logon.`,
         };
       }
 
       const createResult = await runner(buildCreateTaskArgs());
+      if (isSchedulerUnavailable(createResult)) {
+        return {
+          status: "unsupported",
+          detail:
+            "Windows Task Scheduler CLI is unavailable, so startup registration cannot be installed.",
+        };
+      }
+
       if (createResult.code !== 0) {
-        const errorDetail = createResult.stderr || createResult.stdout || "unknown scheduler error";
+        const errorDetail =
+          createResult.stderr ||
+          createResult.stdout ||
+          "unknown scheduler error";
         return {
           status: "not-installed",
           detail: `Failed to register task ${TASK_NAME}: ${errorDetail}.`,
@@ -121,7 +171,9 @@ export function createWindowsTaskSchedulerBackend(runner: SchedulerRunner = runS
         detail: `Registered task ${TASK_NAME} to run ${request.restoreEntrypoint} on user logon.`,
       };
     },
-    uninstall: async (request: StartupBackendRequest): Promise<StartupBackendResult> => {
+    uninstall: async (
+      request: StartupBackendRequest,
+    ): Promise<StartupBackendResult> => {
       if (request.dryRun) {
         return {
           status: "not-installed",
@@ -130,6 +182,14 @@ export function createWindowsTaskSchedulerBackend(runner: SchedulerRunner = runS
       }
 
       const deleteResult = await runner(["/Delete", "/TN", TASK_NAME, "/F"]);
+
+      if (isSchedulerUnavailable(deleteResult)) {
+        return {
+          status: "unsupported",
+          detail:
+            "Windows Task Scheduler CLI is unavailable, so startup registration cannot be removed.",
+        };
+      }
 
       if (deleteResult.code !== 0) {
         return {
