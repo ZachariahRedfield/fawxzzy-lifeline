@@ -76,7 +76,8 @@
     "smoke:runtime:restore-invalid-playbook-export": "node scripts/smoke-runtime-restore-invalid-playbook-export.mjs",
     "smoke:runtime:restart-invalid-playbook-export": "node scripts/smoke-runtime-restart-invalid-playbook-export.mjs",
     "smoke:run": "node scripts/smoke-runner.mjs",
-    "smoke:suite": "node scripts/smoke-suite-runner.mjs"
+    "smoke:suite": "node scripts/smoke-suite-runner.mjs",
+    "ci:verify:esbuild": "node scripts/verify-esbuild-install.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",

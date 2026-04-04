@@ -238,6 +238,14 @@ Smoke suites complement (not replace) deterministic test suites:
 - **Pattern:** Use the single-scenario runner for debugging and the suite runner for grouped verification.
 - **Failure Mode:** Without docs parity, suites exist but contributors keep relying on brittle one-off smoke commands.
 
+## CI toolchain install hardening
+
+- **Rule:** CI test environments must install native optional toolchain packages required by transform-based test runners.
+- **Pattern:** If TypeScript build passes but Vitest fails on `@esbuild/linux-x64`, treat it as install/bootstrap drift first.
+- **Failure Mode:** Cross-platform cache reuse or optional-dependency suppression can produce false regressions across repos.
+
+CI workflows in this repository enforce `NPM_CONFIG_OPTIONAL=true` and `PNPM_CONFIG_OPTIONAL=true`, run a frozen-lockfile install, and execute `pnpm ci:verify:esbuild` before test-like smoke/deterministic suites.
+
 ## Early target manifests
 
 The fitness app and Playbook UI remain early Lifeline targets. Their manifests continue to document the shared contract shape, but actual runtime execution requires a valid local `deploy.workingDirectory` on the machine where Lifeline runs. Their application code does not live in this repository.
