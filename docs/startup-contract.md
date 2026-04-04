@@ -1,6 +1,6 @@
 # Startup contract (merged Wave 2)
 
-Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior. This document tracks the contract boundary and current runtime behavior, including the current Windows fallback path.
+Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior. This document tracks the contract boundary and current runtime behavior, including current Windows Task Scheduler backend behavior.
 
 ## Scope
 
@@ -36,13 +36,13 @@ Startup enabled: <yes|no>
 - detail: <backend/status detail>
 ```
 
-## Contract-only vs real backend status
+## Backend status model
 
-Current default runtime status is **contract-only**. That means:
+Current runtime status uses real backend selection:
 
-- the CLI and persisted startup metadata are real and deterministic now
-- backend seam calls are real (`install`, `uninstall`, `inspect`)
-- the default selected backend may still be `unsupported` for a platform
+- `win32` selects the `windows-task-scheduler` backend.
+- other platforms currently select the explicit `unsupported` backend.
+- backend seam calls are always real (`install`, `uninstall`, `inspect`), with deterministic CLI/state handling around them.
 
 Contract behavior split:
 
@@ -54,14 +54,26 @@ When the selected backend is unsupported, backend readiness resolves as `unsuppo
 
 Once a platform backend lands, this document and deterministic startup verification must be updated in the same change set to keep behavior discoverable.
 
-## Windows status (current)
+## Windows backend status (current)
 
-As of April 4, 2026, default `win32` backend resolution remains contract-only unsupported in normal CLI flow. Lifeline therefore does **not** currently guarantee Task Scheduler registration from `lifeline startup enable`.
+As of April 4, 2026, default `win32` backend resolution uses `windows-task-scheduler`. Lifeline attempts Task Scheduler registration from `lifeline startup enable` by creating `LifelineRestoreAtLogon` at user logon for `lifeline restore`.
 
-Expected unsupported detail shape:
+Expected installed/not-installed detail examples:
 
-- `No startup installer backend is available on win32 yet.`
-- `Intent can still be recorded for future backend availability.`
+- `Registered task LifelineRestoreAtLogon to run lifeline restore on user logon.`
+- `Task LifelineRestoreAtLogon is not currently registered in Windows Task Scheduler.`
+
+If Windows Task Scheduler CLI is unavailable (`schtasks` execution fails), backend readiness resolves as unsupported with explicit detail:
+
+- `Windows Task Scheduler CLI is unavailable, so startup registration cannot be installed.`
+- `Windows Task Scheduler CLI is unavailable, so startup registration cannot be inspected.`
+
+## Unsupported platform behavior
+
+- non-Windows platforms currently resolve to backend id `unsupported`
+- status detail shape includes: `No startup installer backend is available on <platform> yet.`
+- non-dry-run `enable` still records intent and reports: `Intent can still be recorded for future backend availability.`
+- non-dry-run `disable` reports there is nothing platform-specific to remove
 
 ## Restore entrypoint wiring
 
