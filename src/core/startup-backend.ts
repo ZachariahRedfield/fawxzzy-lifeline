@@ -1,7 +1,6 @@
 export type StartupBackendStatus = "installed" | "not-installed" | "unsupported";
 export type RuntimePlatform = string;
-
-import { createWindowsTaskSchedulerBackend } from "./startup-backends/windows-task-scheduler.js";
+export type StartupBackendCapability = "inspect" | "install" | "uninstall";
 
 export interface StartupBackendInspection {
   supported: boolean;
@@ -23,6 +22,7 @@ export interface StartupBackendResult {
 
 export interface StartupBackend {
   id: string;
+  capabilities: StartupBackendCapability[];
   inspect(): Promise<StartupBackendInspection>;
   install(request: StartupBackendRequest): Promise<StartupBackendResult>;
   uninstall(request: StartupBackendRequest): Promise<StartupBackendResult>;
@@ -33,6 +33,7 @@ function createUnsupportedBackend(platform: RuntimePlatform): StartupBackend {
 
   return {
     id: "unsupported",
+    capabilities: ["inspect"],
     inspect: async () => ({
       supported: false,
       status: "unsupported",
@@ -53,10 +54,15 @@ function createUnsupportedBackend(platform: RuntimePlatform): StartupBackend {
   };
 }
 
-export function resolveStartupBackend(platform: RuntimePlatform = process.platform): StartupBackend {
-  if (platform === "win32") {
-    return createWindowsTaskSchedulerBackend();
+export interface StartupBackendResolutionOptions {
+  backend?: StartupBackend;
+  platform?: RuntimePlatform;
+}
+
+export function resolveStartupBackend(options: StartupBackendResolutionOptions = {}): StartupBackend {
+  if (options.backend) {
+    return options.backend;
   }
 
-  return createUnsupportedBackend(platform);
+  return createUnsupportedBackend(options.platform ?? process.platform);
 }

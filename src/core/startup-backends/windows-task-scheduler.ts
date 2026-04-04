@@ -97,6 +97,7 @@ function buildCreateTaskArgs(): string[] {
 export function createWindowsTaskSchedulerBackend(runner: SchedulerRunner = runSchtasks): StartupBackend {
   return {
     id: TASK_MECHANISM,
+    capabilities: ["inspect", "install", "uninstall"],
     inspect: async () => inspectTask(runner),
     install: async (request: StartupBackendRequest): Promise<StartupBackendResult> => {
       if (request.dryRun) {

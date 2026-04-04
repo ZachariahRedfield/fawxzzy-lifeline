@@ -1,6 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { resolveStartupBackend, type StartupBackendStatus } from "./startup-backend.js";
+import {
+  resolveStartupBackend,
+  type StartupBackend,
+  type StartupBackendStatus,
+} from "./startup-backend.js";
 
 export type StartupIntent = "enabled" | "disabled";
 
@@ -121,8 +125,8 @@ async function writeStartupState(state: StartupState): Promise<void> {
 
 export async function planStartupAction(
   action: "enable" | "disable",
+  backend: StartupBackend = resolveStartupBackend(),
 ): Promise<StartupPlan> {
-  const backend = resolveStartupBackend();
   const request = {
     scope: "machine-local" as const,
     restoreEntrypoint: "lifeline restore" as const,
@@ -153,9 +157,10 @@ export async function setStartupIntent(
   });
 }
 
-export async function getStartupStatus(): Promise<StartupStatus> {
+export async function getStartupStatus(
+  backend: StartupBackend = resolveStartupBackend(),
+): Promise<StartupStatus> {
   const state = await readStartupState();
-  const backend = resolveStartupBackend();
   const inspection = await backend.inspect();
   return {
     supported: inspection.supported,
