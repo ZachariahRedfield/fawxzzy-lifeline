@@ -100,6 +100,21 @@ async function main() {
     'README.md must document startup status mechanism contract value contract-only.',
   );
 
+  assert(
+    startupDocs.includes('contract-only') && readme.includes('contract-only'),
+    'Startup docs and README must both explain contract-only startup behavior.',
+  );
+
+  assert(
+    startupDocs.includes('win32') && readme.includes('win32'),
+    'Startup docs and README must both document current Windows (win32) backend status.',
+  );
+
+  assert(
+    startupDocs.includes('without writing state') && readme.includes('without mutating'),
+    'Startup docs and README must both explain dry-run as non-mutating behavior.',
+  );
+
   console.log('Doc/code startup contract parity deterministic verification passed.');
 }
 

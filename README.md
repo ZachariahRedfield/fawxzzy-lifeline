@@ -138,10 +138,11 @@ pnpm lifeline startup disable --dry-run
 
 Current merged Wave 2 startup-contract behavior:
 
-- `startup enable` records startup intent in `.lifeline/startup.json`.
-- `startup disable` clears startup intent in `.lifeline/startup.json`.
-- `startup status` reports scope, canonical restore entrypoint (`lifeline restore`), mechanism (`contract-only`), and backend readiness.
-- `--dry-run` prints the planned startup action without changing state.
+- `startup enable` calls backend seam `install` and persists intent to enabled in `.lifeline/startup.json`.
+- `startup disable` calls backend seam `uninstall` and persists intent to disabled in `.lifeline/startup.json`.
+- `startup status` reports scope, canonical restore entrypoint (`lifeline restore`), mechanism (`contract-only`), and backend readiness from seam inspection.
+- `--dry-run` prints the planned startup action without mutating `.lifeline/startup.json` or performing backend install/uninstall writes.
+- Current Windows (`win32`) behavior is contract-only/unsupported; Lifeline does not yet register Task Scheduler entries.
 - OS-specific installer backends (Task Scheduler/systemd/launchd) are intentionally deferred and must plug in behind this contract.
 
 ## Slim manifest example with Playbook defaults

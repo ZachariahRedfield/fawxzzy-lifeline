@@ -45,11 +45,10 @@ async function runLifeline(cwd, ...args) {
   }
 }
 
-async function readStartupIntent(cwd) {
+async function readStartupState(cwd) {
   const statePath = path.join(cwd, '.lifeline', 'startup.json');
   const raw = await readFile(statePath, 'utf8');
-  const state = JSON.parse(raw);
-  return state.intent;
+  return JSON.parse(raw);
 }
 
 async function main() {
@@ -57,9 +56,23 @@ async function main() {
 
   const enable = await runLifeline(tempDir, 'startup', 'enable');
   assert(enable.code === 0, `Expected startup enable to succeed, got exit code ${enable.code}.`);
+  assert(enable.stdout.includes('Startup intent enabled.'), 'Expected enable confirmation output.');
 
-  const intentAfterEnable = await readStartupIntent(tempDir);
-  assert(intentAfterEnable === 'enabled', `Expected enabled intent, got ${intentAfterEnable}.`);
+  const stateAfterEnable = await readStartupState(tempDir);
+  assert(stateAfterEnable.intent === 'enabled', `Expected enabled intent, got ${stateAfterEnable.intent}.`);
+  assert(
+    stateAfterEnable.backendStatus === 'unsupported',
+    `Expected startup enable to persist unsupported backendStatus from seam, got ${stateAfterEnable.backendStatus}.`,
+  );
+
+  const statusAfterEnable = await runLifeline(tempDir, 'startup', 'status');
+  assert(statusAfterEnable.code === 0, 'Expected startup status after enable to succeed.');
+  assert(statusAfterEnable.stdout.includes('Startup enabled: yes'), 'Expected enabled status after enable.');
+  assert(statusAfterEnable.stdout.includes('Startup supported: no'), 'Expected unsupported backend status to be explicit.');
+  assert(
+    statusAfterEnable.stdout.includes('- mechanism: contract-only'),
+    'Expected status mechanism to remain contract-only when backend is unsupported.',
+  );
 
   const dryRunDisable = await runLifeline(tempDir, 'startup', 'disable', '--dry-run');
   assert(
@@ -67,17 +80,26 @@ async function main() {
     `Expected startup disable --dry-run to succeed, got exit code ${dryRunDisable.code}.`,
   );
 
-  const intentAfterDryRunDisable = await readStartupIntent(tempDir);
+  const stateAfterDryRunDisable = await readStartupState(tempDir);
   assert(
-    intentAfterDryRunDisable === 'enabled',
-    `Expected disable --dry-run to avoid state mutation, got ${intentAfterDryRunDisable}.`,
+    stateAfterDryRunDisable.intent === 'enabled',
+    `Expected disable --dry-run to avoid intent mutation, got ${stateAfterDryRunDisable.intent}.`,
+  );
+  assert(
+    stateAfterDryRunDisable.backendStatus === 'unsupported',
+    `Expected disable --dry-run to avoid backendStatus mutation, got ${stateAfterDryRunDisable.backendStatus}.`,
   );
 
   const disable = await runLifeline(tempDir, 'startup', 'disable');
   assert(disable.code === 0, `Expected startup disable to succeed, got exit code ${disable.code}.`);
+  assert(disable.stdout.includes('Startup intent disabled.'), 'Expected disable confirmation output.');
 
-  const intentAfterDisable = await readStartupIntent(tempDir);
-  assert(intentAfterDisable === 'disabled', `Expected disabled intent, got ${intentAfterDisable}.`);
+  const stateAfterDisable = await readStartupState(tempDir);
+  assert(stateAfterDisable.intent === 'disabled', `Expected disabled intent, got ${stateAfterDisable.intent}.`);
+  assert(
+    stateAfterDisable.backendStatus === 'unsupported',
+    `Expected startup disable to persist unsupported backendStatus from seam, got ${stateAfterDisable.backendStatus}.`,
+  );
 
   const dryRunEnable = await runLifeline(tempDir, 'startup', 'enable', '--dry-run');
   assert(
@@ -85,11 +107,19 @@ async function main() {
     `Expected startup enable --dry-run to succeed, got exit code ${dryRunEnable.code}.`,
   );
 
-  const intentAfterDryRunEnable = await readStartupIntent(tempDir);
+  const stateAfterDryRunEnable = await readStartupState(tempDir);
   assert(
-    intentAfterDryRunEnable === 'disabled',
-    `Expected enable --dry-run to avoid state mutation, got ${intentAfterDryRunEnable}.`,
+    stateAfterDryRunEnable.intent === 'disabled',
+    `Expected enable --dry-run to avoid intent mutation, got ${stateAfterDryRunEnable.intent}.`,
   );
+  assert(
+    stateAfterDryRunEnable.backendStatus === 'unsupported',
+    `Expected enable --dry-run to avoid backendStatus mutation, got ${stateAfterDryRunEnable.backendStatus}.`,
+  );
+
+  const statusAfterDisable = await runLifeline(tempDir, 'startup', 'status');
+  assert(statusAfterDisable.code === 0, 'Expected startup status after disable to succeed.');
+  assert(statusAfterDisable.stdout.includes('Startup enabled: no'), 'Expected disabled status after disable.');
 
   const statusDryRun = await runLifeline(tempDir, 'startup', 'status', '--dry-run');
   assert(
