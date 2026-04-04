@@ -121,6 +121,8 @@ if (recoveredStartupState.restoreEntrypoint !== "lifeline restore") {
 }
 
 if (
+  // Linux now has a real startup backend, so "installed" is valid after startup enable.
+  recoveredStartupState.backendStatus !== "installed" &&
   recoveredStartupState.backendStatus !== "not-installed" &&
   recoveredStartupState.backendStatus !== "unsupported"
 ) {
