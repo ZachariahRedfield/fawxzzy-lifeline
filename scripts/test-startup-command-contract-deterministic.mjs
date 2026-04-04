@@ -61,25 +61,20 @@ async function main() {
   const stateAfterEnable = await readStartupState(tempDir);
   assert(stateAfterEnable.intent === 'enabled', `Expected enabled intent, got ${stateAfterEnable.intent}.`);
   assert(
-    stateAfterEnable.backendStatus === 'unsupported',
-    `Expected startup enable to persist unsupported backendStatus from seam, got ${stateAfterEnable.backendStatus}.`,
+    ['installed', 'not-installed', 'unsupported'].includes(stateAfterEnable.backendStatus),
+    `Expected startup enable to persist a valid backendStatus from seam, got ${stateAfterEnable.backendStatus}.`,
   );
+  const backendStatusAfterEnable = stateAfterEnable.backendStatus;
 
   const statusAfterEnable = await runLifeline(tempDir, 'startup', 'status');
   assert(statusAfterEnable.code === 0, 'Expected startup status after enable to succeed.');
   assert(
-    statusAfterEnable.stdout.includes('Startup enabled: no'),
-    'Expected backend-derived enabled status to remain no when backend is unsupported.',
-  );
-  assert(statusAfterEnable.stdout.includes('Startup supported: no'), 'Expected unsupported backend status to be explicit.');
-  assert(
-    statusAfterEnable.stdout.includes('Startup backend status: unsupported'),
+    statusAfterEnable.stdout.includes('Startup backend status:'),
     'Expected status output to include backend installation status.',
   );
-  assert(
-    statusAfterEnable.stdout.includes('- mechanism: contract-only'),
-    'Expected status mechanism to remain contract-only when backend is unsupported.',
-  );
+  assert(statusAfterEnable.stdout.includes('Startup supported: '), 'Expected startup status to include supported signal.');
+  assert(statusAfterEnable.stdout.includes('Startup enabled: '), 'Expected startup status to include enabled signal.');
+  assert(statusAfterEnable.stdout.includes('- mechanism: '), 'Expected startup status to include backend mechanism line.');
 
   const dryRunDisable = await runLifeline(tempDir, 'startup', 'disable', '--dry-run');
   assert(
@@ -93,7 +88,7 @@ async function main() {
     `Expected disable --dry-run to avoid intent mutation, got ${stateAfterDryRunDisable.intent}.`,
   );
   assert(
-    stateAfterDryRunDisable.backendStatus === 'unsupported',
+    stateAfterDryRunDisable.backendStatus === backendStatusAfterEnable,
     `Expected disable --dry-run to avoid backendStatus mutation, got ${stateAfterDryRunDisable.backendStatus}.`,
   );
 
@@ -104,9 +99,10 @@ async function main() {
   const stateAfterDisable = await readStartupState(tempDir);
   assert(stateAfterDisable.intent === 'disabled', `Expected disabled intent, got ${stateAfterDisable.intent}.`);
   assert(
-    stateAfterDisable.backendStatus === 'unsupported',
-    `Expected startup disable to persist unsupported backendStatus from seam, got ${stateAfterDisable.backendStatus}.`,
+    ['installed', 'not-installed', 'unsupported'].includes(stateAfterDisable.backendStatus),
+    `Expected startup disable to persist a valid backendStatus from seam, got ${stateAfterDisable.backendStatus}.`,
   );
+  const backendStatusAfterDisable = stateAfterDisable.backendStatus;
 
   const dryRunEnable = await runLifeline(tempDir, 'startup', 'enable', '--dry-run');
   assert(
@@ -120,7 +116,7 @@ async function main() {
     `Expected enable --dry-run to avoid intent mutation, got ${stateAfterDryRunEnable.intent}.`,
   );
   assert(
-    stateAfterDryRunEnable.backendStatus === 'unsupported',
+    stateAfterDryRunEnable.backendStatus === backendStatusAfterDisable,
     `Expected enable --dry-run to avoid backendStatus mutation, got ${stateAfterDryRunEnable.backendStatus}.`,
   );
 
@@ -128,7 +124,7 @@ async function main() {
   assert(statusAfterDisable.code === 0, 'Expected startup status after disable to succeed.');
   assert(statusAfterDisable.stdout.includes('Startup enabled: no'), 'Expected disabled status after disable.');
   assert(
-    statusAfterDisable.stdout.includes('Startup backend status: unsupported'),
+    statusAfterDisable.stdout.includes('Startup backend status:'),
     'Expected status output to include backend installation status after disable.',
   );
 

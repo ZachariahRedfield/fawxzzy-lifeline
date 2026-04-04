@@ -6,6 +6,20 @@ function assert(condition, message) {
   }
 }
 
+async function verifyLinuxDefaultSelection() {
+  const backend = resolveStartupBackend({ platform: 'linux' });
+  const inspection = await backend.inspect();
+
+  assert(
+    backend.id === 'systemd-user',
+    `Expected systemd-user backend id for linux, got ${backend.id}.`,
+  );
+  assert(
+    inspection.mechanism === 'systemd-user',
+    `Expected systemd-user mechanism for linux, got ${inspection.mechanism}.`,
+  );
+}
+
 async function verifyUnsupportedDefaultSelection(platform) {
   const backend = resolveStartupBackend({ platform });
   const inspection = await backend.inspect();
@@ -98,7 +112,7 @@ async function main() {
     windowsInspection.mechanism === 'windows-task-scheduler',
     `Expected Windows mechanism windows-task-scheduler, got ${windowsInspection.mechanism}.`,
   );
-  await verifyUnsupportedDefaultSelection('linux');
+  await verifyLinuxDefaultSelection();
   await verifyUnsupportedDefaultSelection('darwin');
   await verifyInjectedBackendSelection();
   await verifyRegistrySelectionAndFallback();

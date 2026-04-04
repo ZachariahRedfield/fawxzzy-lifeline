@@ -1,6 +1,6 @@
 # Startup contract (merged Wave 2)
 
-Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior. This document tracks the contract boundary and current runtime behavior, including current Windows Task Scheduler support and unsupported-platform fallback behavior.
+Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior. This document tracks the contract boundary and current runtime behavior, including current Windows Task Scheduler support, Linux user-systemd support, and unsupported-platform fallback behavior.
 
 ## Scope
 
@@ -67,13 +67,25 @@ Behavior:
 - `startup status` inspects the same task via `schtasks /Query ...` and reports `windows-task-scheduler` mechanism.
 - If Task Scheduler CLI is unavailable, backend detail is explicit and readiness resolves to `unsupported`.
 
+
+## Linux backend status (current)
+
+As of April 4, 2026, default `linux` backend resolution selects the `systemd-user` backend in normal CLI flow.
+
+Behavior:
+
+- `startup enable` writes `~/.config/systemd/user/lifeline-restore.service`, reloads the user manager, and enables/starts the unit for `lifeline restore`.
+- `startup disable` disables/stops `lifeline-restore.service`, removes that unit file, and reloads the user manager.
+- `startup status` inspects the same user unit via `systemctl --user cat lifeline-restore.service` and reports `systemd-user` mechanism.
+- If `systemctl` is unavailable for the user session, backend detail is explicit and readiness resolves to `unsupported`.
+
 ## Unsupported platform behavior (current)
 
-Platforms without a registered installer backend currently resolve to the `unsupported` backend:
+Platforms without a registered installer backend currently resolve to the `unsupported` backend (for example, `darwin` and `freebsd`):
 
 - mechanism is `contract-only`
 - status is `unsupported`
-- detail includes the concrete platform name (for example, `No startup installer backend is available on linux yet.`)
+- detail includes the concrete platform name (for example, `No startup installer backend is available on darwin yet.`)
 - startup intent still persists in `.lifeline/startup.json` for future backend availability
 
 ## Restore entrypoint wiring
@@ -97,4 +109,4 @@ No platform-specific registration identifiers are persisted in this slice.
 
 Future platform installers must plug into this contract, not bypass it. Backends should read the contract intent and apply OS-specific wiring while preserving the contract's machine-local scope and restore-entrypoint target.
 
-Current shipped installer coverage is `win32` via Task Scheduler; remaining deferred startup installers are Linux/macOS platform backends (for example, `systemd` and `launchd`).
+Current shipped installer coverage is `win32` via Task Scheduler and `linux` via user systemd; remaining deferred startup installers are unregistered platforms (for example, macOS `launchd`).

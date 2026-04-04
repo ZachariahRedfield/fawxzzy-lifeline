@@ -1,3 +1,4 @@
+import { createSystemdUserBackend } from "./startup-backends/systemd.js";
 import { createWindowsTaskSchedulerBackend } from "./startup-backends/windows-task-scheduler.js";
 
 export type StartupBackendStatus = "installed" | "not-installed" | "unsupported";
@@ -38,6 +39,7 @@ export interface StartupBackendRegistry {
 
 const DEFAULT_STARTUP_BACKEND_REGISTRY: StartupBackendRegistry = {
   byPlatform: {
+    linux: () => createSystemdUserBackend(),
     win32: () => createWindowsTaskSchedulerBackend(),
   },
 };

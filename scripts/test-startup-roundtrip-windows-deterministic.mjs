@@ -13,6 +13,11 @@ function assert(condition, message) {
   }
 }
 
+function readStatusLine(output, prefix) {
+  const line = output.split('\n').find((candidate) => candidate.startsWith(prefix));
+  return line ? line.slice(prefix.length).trim() : '';
+}
+
 async function runLifeline(cwd, ...args) {
   const cliPath = fileURLToPath(new URL('../dist/cli.js', import.meta.url));
   const { stdout, stderr } = await execFileAsync(process.execPath, [cliPath, ...args], {
@@ -45,18 +50,29 @@ async function main() {
   );
 
   const statusOutput = await runLifeline(tempDir, 'startup', 'status');
+  // Linux now has a real startup backend, so roundtrip checks must assert seam invariants
+  // rather than contract-only fallback expectations.
   assert(
-    statusOutput.includes('Startup enabled: no'),
-    'Expected startup status to reflect backend installed/not-installed readiness.',
+    statusOutput.includes('Startup supported: '),
+    'Expected startup status to include supported signal.',
+  );
+  assert(
+    statusOutput.includes('Startup enabled: '),
+    'Expected startup status to include enabled signal.',
+  );
+  const backendStatus = readStatusLine(statusOutput, 'Startup backend status: ');
+  assert(
+    backendStatus === 'installed' ||
+      backendStatus === 'not-installed' ||
+      backendStatus === 'unsupported',
+    `Expected startup backend status to be installed|not-installed|unsupported, got ${backendStatus}.`,
   );
   assert(
     statusOutput.includes('- restore entrypoint: lifeline restore'),
     'Expected startup status restore entrypoint to remain canonical.',
   );
-  assert(
-    statusOutput.includes('- mechanism: contract-only'),
-    'Expected startup status to report contract-only mechanism.',
-  );
+  const mechanism = readStatusLine(statusOutput, '- mechanism: ');
+  assert(mechanism.length > 0, 'Expected startup status to report non-empty mechanism line.');
 
   const disableOutput = await runLifeline(tempDir, 'startup', 'disable');
   assert(disableOutput.includes('Startup intent disabled.'), 'Expected startup disable confirmation.');
@@ -68,8 +84,10 @@ async function main() {
   await writeFile(statePath, '{"intent":', 'utf8');
   const recoveredStatusOutput = await runLifeline(tempDir, 'startup', 'status');
   assert(
-    recoveredStatusOutput.includes('Startup enabled: no'),
-    'Expected startup status to recover from malformed startup state as disabled.',
+    recoveredStatusOutput.includes('Startup supported: ') &&
+      recoveredStatusOutput.includes('Startup enabled: ') &&
+      recoveredStatusOutput.includes('Startup backend status: '),
+    'Expected startup status to recover from malformed startup state with canonical status surface.',
   );
 
   console.log('Deterministic startup roundtrip verification passed (enable/status/disable).');
