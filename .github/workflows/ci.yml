@@ -47,31 +47,33 @@ jobs:
           path: dist
           if-no-files-found: error
 
-  smoke-suite-matrix:
+  suite-matrix:
     runs-on: ubuntu-latest
-    needs: validate
     outputs:
-      suites: ${{ steps.suites.outputs.suites }}
+      smoke_suites: ${{ steps.suites.outputs.smoke_suites }}
+      deterministic_suites: ${{ steps.suites.outputs.deterministic_suites }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Determine smoke suites
+      - name: Determine suite matrices
         id: suites
         run: |
-          suites_json=$(node -e "const suites=require('./scripts/smoke-suites.json'); process.stdout.write(JSON.stringify(Object.keys(suites)));")
-          echo "suites=$suites_json" >> "$GITHUB_OUTPUT"
+          smoke_suites=$(node -e "const suites=require('./scripts/smoke-suites.json'); process.stdout.write(JSON.stringify(Object.keys(suites)));")
+          deterministic_suites=$(node -e "const suites=require('./scripts/test-suites.json'); process.stdout.write(JSON.stringify(Object.keys(suites)));")
+          echo "smoke_suites=$smoke_suites" >> "$GITHUB_OUTPUT"
+          echo "deterministic_suites=$deterministic_suites" >> "$GITHUB_OUTPUT"
 
   smoke-suites:
     name: smoke-suite (${{ matrix.suite }})
     runs-on: ubuntu-latest
     needs:
       - validate
-      - smoke-suite-matrix
+      - suite-matrix
     strategy:
       fail-fast: false
       matrix:
-        suite: ${{ fromJson(needs.smoke-suite-matrix.outputs.suites) }}
+        suite: ${{ fromJson(needs.suite-matrix.outputs.smoke_suites) }}
 
     steps:
       - name: Checkout
@@ -103,31 +105,16 @@ jobs:
       - name: Run smoke suite
         run: node scripts/smoke-suite-runner.mjs ${{ matrix.suite }}
 
-  deterministic-suite-matrix:
-    runs-on: ubuntu-latest
-    needs: validate
-    outputs:
-      suites: ${{ steps.suites.outputs.suites }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Determine deterministic suites
-        id: suites
-        run: |
-          suites_json=$(node -e "const suites=require('./scripts/test-suites.json'); process.stdout.write(JSON.stringify(Object.keys(suites)));")
-          echo "suites=$suites_json" >> "$GITHUB_OUTPUT"
-
   deterministic-suites:
     name: deterministic-suite (${{ matrix.suite }})
     runs-on: ubuntu-latest
     needs:
       - validate
-      - deterministic-suite-matrix
+      - suite-matrix
     strategy:
       fail-fast: false
       matrix:
-        suite: ${{ fromJson(needs.deterministic-suite-matrix.outputs.suites) }}
+        suite: ${{ fromJson(needs.suite-matrix.outputs.deterministic_suites) }}
 
     steps:
       - name: Checkout
