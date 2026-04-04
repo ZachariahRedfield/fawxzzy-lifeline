@@ -140,23 +140,27 @@ Current merged Wave 2 startup-contract behavior:
 
 - `startup enable` calls backend seam `install` and persists intent to enabled in `.lifeline/startup.json`.
 - `startup disable` calls backend seam `uninstall` and persists intent to disabled in `.lifeline/startup.json`.
-- `startup status` reports scope, canonical restore entrypoint (`lifeline restore`), mechanism (`contract-only`), and backend readiness from seam inspection.
+- `startup status` reports support, enabled intent, backend install status, scope, canonical restore entrypoint (`lifeline restore`), mechanism, and backend detail from seam inspection.
 - `--dry-run` prints the planned startup action without mutating `.lifeline/startup.json` or performing backend install/uninstall writes.
-- Current Windows (`win32`) behavior is contract-only/unsupported in default CLI backend selection, so Lifeline does not currently guarantee Task Scheduler entries from `startup enable`.
-- OS-specific installer backends (Task Scheduler/systemd/launchd) are intentionally deferred and must plug in behind this contract.
+- Current Windows (`win32`) behavior uses a real Task Scheduler backend (`windows-task-scheduler`) in default CLI backend selection.
+- Non-Windows platforms currently fall back to the unsupported contract backend (`contract-only`) with explicit status/detail output.
+- Linux/macOS startup installers (for example `systemd`/`launchd`) are intentionally deferred and must plug in behind this contract.
+
+When the active backend is unsupported, startup status reports mechanism (`contract-only`) so fallback behavior stays explicit.
 
 Deterministic status output shape:
 
 ```text
 Startup supported: <yes|no>
 Startup enabled: <yes|no>
+Startup backend status: <installed|not-installed|unsupported>
 - mechanism: <backend mechanism>
 - scope: machine-local
 - restore entrypoint: lifeline restore
 - detail: <backend/status detail>
 ```
 
-For unsupported backends (including current default `win32` behavior as of April 4, 2026), status and mutation detail must remain explicit (for example, `No startup installer backend is available on win32 yet.`) so startup state is not tribal knowledge.
+For unsupported backends, status and mutation detail must remain explicit (for example, `No startup installer backend is available on linux yet.`) so startup state is not tribal knowledge.
 
 ## Slim manifest example with Playbook defaults
 

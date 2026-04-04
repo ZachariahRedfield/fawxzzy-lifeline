@@ -1,6 +1,6 @@
 # Startup contract (merged Wave 2)
 
-Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior. This document tracks the contract boundary and current runtime behavior, including the current Windows fallback path.
+Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior. This document tracks the contract boundary and current runtime behavior, including current Windows Task Scheduler support and unsupported-platform fallback behavior.
 
 ## Scope
 
@@ -30,6 +30,7 @@ Status output shape (deterministic):
 ```text
 Startup supported: <yes|no>
 Startup enabled: <yes|no>
+Startup backend status: <installed|not-installed|unsupported>
 - mechanism: <backend mechanism>
 - scope: machine-local
 - restore entrypoint: lifeline restore
@@ -38,30 +39,42 @@ Startup enabled: <yes|no>
 
 ## Contract-only vs real backend status
 
-Current default runtime status is **contract-only**. That means:
+Current runtime selection supports both real platform installers and contract-only fallback:
 
-- the CLI and persisted startup metadata are real and deterministic now
+- the CLI and persisted startup metadata are real and deterministic
 - backend seam calls are real (`install`, `uninstall`, `inspect`)
-- the default selected backend may still be `unsupported` for a platform
+- the selected backend may be platform-specific (`windows-task-scheduler`) or `unsupported`
 
 Contract behavior split:
 
 - `startup enable`/`startup disable` always call backend seam install/uninstall before persisting intent.
 - `startup status` always reports the active seam `inspect` view plus persisted intent.
 - `enable --dry-run` / `disable --dry-run` execute planning only and remain non-mutating.
+- dry-run planning reports the same canonical restore entrypoint (`lifeline restore`) and backend status/detail shape as mutation flows.
 
 When the selected backend is unsupported, backend readiness resolves as `unsupported` and `.lifeline/startup.json` persists that seam result after non-dry-run `enable` and `disable`.
 
 Once a platform backend lands, this document and deterministic startup verification must be updated in the same change set to keep behavior discoverable.
 
-## Windows status (current)
+## Windows backend status (current)
 
-As of April 4, 2026, default `win32` backend resolution remains contract-only unsupported in normal CLI flow. Lifeline therefore does **not** currently guarantee Task Scheduler registration from `lifeline startup enable`.
+As of April 4, 2026, default `win32` backend resolution selects the `windows-task-scheduler` backend in normal CLI flow.
 
-Expected unsupported detail shape:
+Behavior:
 
-- `No startup installer backend is available on win32 yet.`
-- `Intent can still be recorded for future backend availability.`
+- `startup enable` attempts `schtasks /Create ...` for task `LifelineRestoreAtLogon` targeting `lifeline restore`.
+- `startup disable` attempts `schtasks /Delete ...` for task `LifelineRestoreAtLogon`.
+- `startup status` inspects the same task via `schtasks /Query ...` and reports `windows-task-scheduler` mechanism.
+- If Task Scheduler CLI is unavailable, backend detail is explicit and readiness resolves to `unsupported`.
+
+## Unsupported platform behavior (current)
+
+Platforms without a registered installer backend currently resolve to the `unsupported` backend:
+
+- mechanism is `contract-only`
+- status is `unsupported`
+- detail includes the concrete platform name (for example, `No startup installer backend is available on linux yet.`)
+- startup intent still persists in `.lifeline/startup.json` for future backend availability
 
 ## Restore entrypoint wiring
 
@@ -83,3 +96,5 @@ No platform-specific registration identifiers are persisted in this slice.
 ## Backend contract expectation
 
 Future platform installers must plug into this contract, not bypass it. Backends should read the contract intent and apply OS-specific wiring while preserving the contract's machine-local scope and restore-entrypoint target.
+
+Remaining deferred startup installers are Linux/macOS platform backends (for example, `systemd` and `launchd`).
