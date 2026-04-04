@@ -39,13 +39,16 @@ function runSmokeScript(scenarioName) {
   const fileName = `${smokePrefix}${scenarioName}${smokeSuffix}`;
   const filePath = path.join(fileURLToPath(scriptsDir), fileName);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const child = spawn("node", [filePath], {
       stdio: "inherit",
       env: process.env,
     });
 
-    child.on("error", reject);
+    child.on("error", (error) => {
+      console.error(`Failed to launch smoke scenario "${scenarioName}": ${error.message}`);
+      resolve({ code: 1, signal: undefined });
+    });
     child.on("exit", (code, signal) => {
       if (signal) {
         resolve({ code: 1, signal });
@@ -63,16 +66,18 @@ async function runSuite(suiteName, scenarios) {
     const result = await runSmokeScript(scenario);
     if (result.signal) {
       console.error(`Smoke scenario "${scenario}" terminated by signal ${result.signal}.`);
-      process.exit(result.code);
+      return result.code;
     }
     if (result.code !== 0) {
-      process.exit(result.code);
+      return result.code;
     }
   }
+
+  return 0;
 }
 
 const suites = await loadSuites();
-const suiteNames = Object.keys(suites);
+const suiteNames = Object.keys(suites).sort((left, right) => left.localeCompare(right));
 const [, , suiteArg] = process.argv;
 
 if (!suiteArg) {
@@ -89,7 +94,10 @@ if (suiteArg === "list") {
 
 if (suiteArg === "all") {
   for (const suiteName of suiteNames) {
-    await runSuite(suiteName, suites[suiteName]);
+    const code = await runSuite(suiteName, suites[suiteName]);
+    if (code !== 0) {
+      process.exit(code);
+    }
   }
   process.exit(0);
 }
@@ -101,4 +109,5 @@ if (!suiteScenarios) {
   process.exit(1);
 }
 
-await runSuite(suiteArg, suiteScenarios);
+const code = await runSuite(suiteArg, suiteScenarios);
+process.exit(code);
