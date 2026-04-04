@@ -160,7 +160,7 @@ Startup backend status: <installed|not-installed|unsupported>
 - detail: <backend/status detail>
 ```
 
-For unsupported backends, status and mutation detail must remain explicit (for example, `No startup installer backend is available on linux yet.`) so startup state is not tribal knowledge.
+For unsupported backends, status and mutation detail must remain explicit (for example, `No startup installer backend is available on darwin yet.`) so startup state is not tribal knowledge.
 
 ## Slim manifest example with Playbook defaults
 
