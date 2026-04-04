@@ -69,6 +69,11 @@ function isSchedulerUnavailable(result: SchedulerCommandResult): boolean {
   return result.code === -1;
 }
 
+function isTaskMissing(result: SchedulerCommandResult): boolean {
+  const combined = `${result.stdout}\n${result.stderr}`.toLowerCase();
+  return combined.includes("cannot find") || combined.includes("task not found");
+}
+
 async function inspectTask(
   runner: SchedulerRunner,
 ): Promise<StartupBackendInspection> {
@@ -201,6 +206,13 @@ export function createWindowsTaskSchedulerBackend(
       }
 
       if (deleteResult.code !== 0) {
+        if (isTaskMissing(deleteResult)) {
+          return {
+            status: "not-installed",
+            detail: `Task ${TASK_NAME} is already absent from Windows Task Scheduler.`,
+          };
+        }
+
         return {
           status: "not-installed",
           detail:

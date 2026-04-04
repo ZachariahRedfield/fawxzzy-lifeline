@@ -35,6 +35,10 @@ function buildStartupRequest(dryRun: boolean) {
 }
 
 function buildStartupStatusDetail(intent: StartupIntent, backendStatus: StartupBackendStatus, backendDetail: string) {
+  if (backendStatus === "unsupported") {
+    return `Startup intent is ${intent} in Lifeline state. Backend reports unsupported on this platform. ${backendDetail}`;
+  }
+
   const intentMatchesBackend =
     (intent === "enabled" && backendStatus === "installed") ||
     (intent === "disabled" && backendStatus !== "installed");

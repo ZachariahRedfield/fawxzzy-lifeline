@@ -64,7 +64,7 @@ function createUnsupportedBackend(platform: RuntimePlatform): StartupBackend {
       status: "unsupported",
       detail: request.dryRun
         ? `${detail} Dry-run only reports the contract plan.`
-        : "No startup installer backend is currently configured, so there is nothing platform-specific to remove.",
+        : `${detail} There is nothing platform-specific to remove right now.`,
     }),
   };
 }
