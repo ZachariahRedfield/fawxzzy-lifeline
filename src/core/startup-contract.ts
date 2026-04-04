@@ -123,17 +123,20 @@ export async function planStartupAction(
   action: "enable" | "disable",
 ): Promise<StartupPlan> {
   const backend = resolveStartupBackend();
-  const inspection = await backend.inspect();
+  const request = {
+    scope: "machine-local" as const,
+    restoreEntrypoint: "lifeline restore" as const,
+    dryRun: true,
+  };
+
+  const preview = action === "enable" ? await backend.install(request) : await backend.uninstall(request);
 
   return {
     action,
-    scope: "machine-local",
-    restoreEntrypoint: "lifeline restore",
-    backendStatus: inspection.status,
-    detail:
-      action === "enable"
-        ? inspection.detail
-        : `${inspection.detail} Disable keeps contract intent aligned even when no backend is installed.`,
+    scope: request.scope,
+    restoreEntrypoint: request.restoreEntrypoint,
+    backendStatus: preview.status,
+    detail: preview.detail,
   };
 }
 

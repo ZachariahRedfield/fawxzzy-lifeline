@@ -6,6 +6,25 @@ function assert(condition, message) {
   }
 }
 
+async function verifyWindowsSelection() {
+  const backend = resolveStartupBackend('win32');
+  const inspection = await backend.inspect();
+
+  assert(
+    backend.id === 'windows-task-scheduler',
+    `Expected windows-task-scheduler backend id for win32, got ${backend.id}.`,
+  );
+  assert(inspection.supported === true, 'Expected win32 backend to report supported.');
+  assert(
+    inspection.status === 'installed' || inspection.status === 'not-installed',
+    `Expected win32 inspection status installed/not-installed, got ${inspection.status}.`,
+  );
+  assert(
+    inspection.mechanism === 'windows-task-scheduler',
+    `Expected windows mechanism, got ${inspection.mechanism}.`,
+  );
+}
+
 async function verifyUnsupportedSelection(platform) {
   const backend = resolveStartupBackend(platform);
   const inspection = await backend.inspect();
@@ -20,7 +39,7 @@ async function verifyUnsupportedSelection(platform) {
 }
 
 async function main() {
-  await verifyUnsupportedSelection('win32');
+  await verifyWindowsSelection();
   await verifyUnsupportedSelection('linux');
   await verifyUnsupportedSelection('darwin');
   console.log('Deterministic startup backend selection verification passed.');
