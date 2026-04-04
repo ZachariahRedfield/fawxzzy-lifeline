@@ -59,9 +59,10 @@ async function runSchtasks(args: string[]): Promise<SchedulerCommandResult> {
 
 function matchesConfiguredTask(queryOutput: string): boolean {
   const normalized = queryOutput.toLowerCase();
+  const expectedEntrypoint = RESTORE_ENTRYPOINT.toLowerCase();
   return (
     normalized.includes(TASK_NAME.toLowerCase()) &&
-    normalized.includes(RESTORE_ENTRYPOINT)
+    normalized.includes(expectedEntrypoint)
   );
 }
 

@@ -34,7 +34,12 @@ function buildStartupRequest(dryRun: boolean) {
   };
 }
 
-function buildStartupStatusDetail(intent: StartupIntent, backendStatus: StartupBackendStatus, backendDetail: string) {
+function buildStartupStatusDetail(
+  intent: StartupIntent,
+  backendStatus: StartupBackendStatus,
+  backendDetail: string,
+  lastKnownBackendStatus: StartupBackendStatus,
+) {
   if (backendStatus === "unsupported") {
     return `Startup intent is ${intent} in Lifeline state. Backend reports unsupported on this platform. ${backendDetail}`;
   }
@@ -47,7 +52,12 @@ function buildStartupStatusDetail(intent: StartupIntent, backendStatus: StartupB
     ? `Startup intent is ${intent} in Lifeline state.`
     : `Startup intent is ${intent} in Lifeline state but backend inspection is ${backendStatus}.`;
 
-  return `${intentDetail} ${backendDetail}`;
+  const persistenceDetail =
+    lastKnownBackendStatus === backendStatus
+      ? "Persisted startup backend status matches backend inspection."
+      : `Persisted startup backend status is ${lastKnownBackendStatus} while backend inspection is ${backendStatus}.`;
+
+  return `${intentDetail} ${persistenceDetail} ${backendDetail}`;
 }
 
 interface StartupState {
@@ -194,7 +204,12 @@ export async function getStartupStatus(
     enabled: backendEnabled,
     backendStatus: inspection.status,
     mechanism: inspection.mechanism,
-    detail: buildStartupStatusDetail(state.intent, inspection.status, inspection.detail),
+    detail: buildStartupStatusDetail(
+      state.intent,
+      inspection.status,
+      inspection.detail,
+      state.backendStatus,
+    ),
     scope: state.scope,
     restoreEntrypoint: state.restoreEntrypoint,
   };

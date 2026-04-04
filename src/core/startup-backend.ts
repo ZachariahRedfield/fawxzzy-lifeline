@@ -44,6 +44,7 @@ const DEFAULT_STARTUP_BACKEND_REGISTRY: StartupBackendRegistry = {
 
 function createUnsupportedBackend(platform: RuntimePlatform): StartupBackend {
   const detail = `No startup installer backend is available on ${platform} yet.`;
+  const contractFallbackDetail = "Falling back to contract-only startup behavior.";
 
   return {
     id: "unsupported",
@@ -57,14 +58,14 @@ function createUnsupportedBackend(platform: RuntimePlatform): StartupBackend {
     install: async (request) => ({
       status: "unsupported",
       detail: request.dryRun
-        ? `${detail} Dry-run only reports the contract plan.`
-        : `${detail} Intent can still be recorded for future backend availability.`,
+        ? `${detail} ${contractFallbackDetail} Dry-run only reports the contract plan.`
+        : `${detail} ${contractFallbackDetail} Intent can still be recorded for future backend availability.`,
     }),
     uninstall: async (request) => ({
       status: "unsupported",
       detail: request.dryRun
-        ? `${detail} Dry-run only reports the contract plan.`
-        : `${detail} There is nothing platform-specific to remove right now.`,
+        ? `${detail} ${contractFallbackDetail} Dry-run only reports the contract plan.`
+        : `${detail} ${contractFallbackDetail} There is nothing platform-specific to remove right now.`,
     }),
   };
 }

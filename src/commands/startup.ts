@@ -20,6 +20,12 @@ function printStatus(backend = resolveStartupBackend()): Promise<number> {
   });
 }
 
+function maybePrintUnsupportedFallback(status: "installed" | "not-installed" | "unsupported"): void {
+  if (status === "unsupported") {
+    console.log("Startup backend is in contract-only fallback mode on this platform.");
+  }
+}
+
 export async function runStartupCommand(
   action: string | undefined,
   option: string | undefined,
@@ -52,6 +58,7 @@ export async function runStartupCommand(
     await setStartupIntent("enabled", backendResult.status);
     console.log("Startup intent enabled.");
     console.log(backendResult.detail);
+    maybePrintUnsupportedFallback(backendResult.status);
     return printStatus(backend);
   }
 
@@ -71,6 +78,7 @@ export async function runStartupCommand(
     await setStartupIntent("disabled", backendResult.status);
     console.log("Startup intent disabled.");
     console.log(backendResult.detail);
+    maybePrintUnsupportedFallback(backendResult.status);
     return printStatus(backend);
   }
 

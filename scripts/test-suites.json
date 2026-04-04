@@ -46,6 +46,7 @@
     "test-startup-state-atomic-write-deterministic.mjs",
     "test-startup-state-invalid-shape-deterministic.mjs",
     "test-startup-windows-task-scheduler-harness-deterministic.mjs",
+    "test-startup-windows-seam-backend-flow-deterministic.mjs",
     "test-startup-windows-backend-deterministic.mjs",
     "test-supervisor-blocked-state-clears-listener-deterministic.mjs",
     "test-supervisor-blocked-state-clears-runtime-pids-deterministic.mjs"
