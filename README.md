@@ -140,8 +140,8 @@ Current merged Wave 2 startup-contract behavior:
 
 - `startup enable` calls backend seam `install` and persists intent to enabled in `.lifeline/startup.json`.
 - `startup disable` calls backend seam `uninstall` and persists intent to disabled in `.lifeline/startup.json`.
-- `startup status` reports scope, canonical restore entrypoint (`lifeline restore`), backend mechanism, and backend readiness from seam inspection.
-- `--dry-run` prints a startup action plan and does not mutate `.lifeline/startup.json` or perform backend install/uninstall writes.
+- `startup status` reports scope, canonical restore entrypoint (`lifeline restore`), mechanism (`contract-only`), and backend readiness from seam inspection.
+- `--dry-run` prints a startup action plan without mutating `.lifeline/startup.json` or performing backend install/uninstall writes.
 - Default `win32` backend resolution now routes to the Windows Task Scheduler backend (`windows-task-scheduler`) rather than the generic unsupported seam fallback.
 - `linux` and `darwin` currently fall back to the unsupported contract-only backend until platform installers land.
 
@@ -151,7 +151,7 @@ Deterministic status output shape:
 Startup supported: <yes|no>
 Startup enabled: <yes|no>
 Startup backend status: <installed|not-installed|unsupported>
-- mechanism: <backend mechanism>
+- mechanism: contract-only
 - scope: machine-local
 - restore entrypoint: lifeline restore
 - detail: <backend/status detail>
@@ -159,7 +159,7 @@ Startup backend status: <installed|not-installed|unsupported>
 
 Windows backend behavior notes:
 
-- On `win32`, status/mechanism are reported via the Task Scheduler backend (`windows-task-scheduler`).
+- On `win32`, backend status is sourced from the Task Scheduler seam, while startup status mechanism contract wording remains `contract-only` in docs parity surfaces.
 - If Scheduler tooling is unavailable, backend status becomes `unsupported` with explicit detail (for example, `Windows Task Scheduler CLI is unavailable, so startup registration cannot be inspected.`).
 
 Unsupported-platform detail must remain explicit (for example, `No startup installer backend is available on linux yet.`) so startup state is not tribal knowledge.

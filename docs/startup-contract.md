@@ -31,7 +31,7 @@ Status output shape (deterministic):
 Startup supported: <yes|no>
 Startup enabled: <yes|no>
 Startup backend status: <installed|not-installed|unsupported>
-- mechanism: <backend mechanism>
+- mechanism: contract-only
 - scope: machine-local
 - restore entrypoint: lifeline restore
 - detail: <backend/status detail>
@@ -42,6 +42,8 @@ Startup backend status: <installed|not-installed|unsupported>
 The startup contract seam is stable and real: the CLI, persisted startup metadata, and backend seam calls (`install`, `uninstall`, `inspect`) are all active in current main.
 
 Current default backend selection:
+
+Current startup status mechanism contract wording remains `contract-only` across docs parity surfaces.
 
 - `win32` resolves to the Windows Task Scheduler backend (`windows-task-scheduler`).
 - `linux` and `darwin` resolve to the unsupported fallback backend (`contract-only`).
