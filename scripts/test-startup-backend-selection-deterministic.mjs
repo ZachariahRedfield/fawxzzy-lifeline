@@ -6,6 +6,22 @@ function assert(condition, message) {
   }
 }
 
+
+async function verifyDarwinDefaultSelection() {
+  const backend = resolveStartupBackend({ platform: 'darwin' });
+  const inspection = await backend.inspect();
+
+  assert(
+    backend.id === 'launchd-agent',
+    `Expected launchd-agent backend id for darwin, got ${backend.id}.`,
+  );
+  assert(inspection.mechanism === 'launchd-agent', `Expected launchd-agent mechanism for darwin, got ${inspection.mechanism}.`);
+  assert(
+    ['installed', 'not-installed', 'unsupported'].includes(inspection.status),
+    `Expected darwin inspection status to be installed|not-installed|unsupported, got ${inspection.status}.`,
+  );
+}
+
 async function verifyLinuxDefaultSelection() {
   const backend = resolveStartupBackend({ platform: 'linux' });
   const inspection = await backend.inspect();
@@ -112,8 +128,9 @@ async function main() {
     windowsInspection.mechanism === 'windows-task-scheduler',
     `Expected Windows mechanism windows-task-scheduler, got ${windowsInspection.mechanism}.`,
   );
+  await verifyDarwinDefaultSelection();
   await verifyLinuxDefaultSelection();
-  await verifyUnsupportedDefaultSelection('darwin');
+  await verifyUnsupportedDefaultSelection('freebsd');
   await verifyInjectedBackendSelection();
   await verifyRegistrySelectionAndFallback();
   console.log('Deterministic startup backend selection verification passed.');

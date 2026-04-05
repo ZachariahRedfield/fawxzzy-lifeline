@@ -96,7 +96,7 @@ Platforms without a registered installer backend currently resolve to the `unsup
 
 - mechanism is `contract-only`
 - status is `unsupported`
-- detail includes the concrete platform name (for example, `No startup installer backend is available on darwin yet.`)
+- detail includes the concrete platform name (for example, `No startup installer backend is available on freebsd yet.`)
 - startup intent still persists in `.lifeline/startup.json` for future backend availability
 
 ## Restore entrypoint wiring
