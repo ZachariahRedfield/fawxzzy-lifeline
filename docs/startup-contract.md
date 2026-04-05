@@ -1,6 +1,6 @@
 # Startup contract (merged Wave 2)
 
-Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior. This document tracks the contract boundary and current runtime behavior, including current Windows Task Scheduler support, Linux user-systemd support, macOS launchd support, and unsupported-platform fallback behavior.
+Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior. This document tracks the contract boundary and current runtime behavior, including current Windows Task Scheduler support, Linux user-systemd support, macOS launchd support, FreeBSD rc.d support, and unsupported-platform fallback behavior.
 
 ## Scope
 
@@ -90,13 +90,24 @@ Behavior:
 - `startup status` verifies canonical `lifeline restore` ProgramArguments from that plist and inspects `launchctl print gui/<uid>/io.lifeline.restore` to report install state via `launchd-agent` mechanism.
 - If `launchctl` is unavailable, backend detail is explicit and readiness resolves to `unsupported`.
 
+## FreeBSD backend status (current)
+
+As of April 5, 2026, default `freebsd` backend resolution selects the `freebsd-rc.d` backend in normal CLI flow.
+
+Behavior:
+
+- `startup enable` writes `/usr/local/etc/rc.d/lifeline_restore`, sets executable permissions, and writes `/etc/rc.conf.d/lifeline_restore` with `lifeline_restore_enable="YES"` so startup targets `lifeline restore`.
+- `startup disable` removes `/usr/local/etc/rc.d/lifeline_restore` and `/etc/rc.conf.d/lifeline_restore`.
+- `startup status` inspects those same files to verify canonical `lifeline restore` wiring and reports install state via `freebsd-rc.d` mechanism.
+- Install/uninstall may fail without write access to system startup paths; backend detail remains explicit when that occurs.
+
 ## Unsupported platform behavior (current)
 
-Platforms without a registered installer backend currently resolve to the `unsupported` backend (for example, `freebsd`):
+Platforms without a registered installer backend currently resolve to the `unsupported` backend (for example, `openbsd`):
 
 - mechanism is `contract-only`
 - status is `unsupported`
-- detail includes the concrete platform name (for example, `No startup installer backend is available on freebsd yet.`)
+- detail includes the concrete platform name (for example, `No startup installer backend is available on openbsd yet.`)
 - startup intent still persists in `.lifeline/startup.json` for future backend availability
 
 ## Restore entrypoint wiring
@@ -120,4 +131,4 @@ No platform-specific registration identifiers are persisted in this slice.
 
 Future platform installers must plug into this contract, not bypass it. Backends should read the contract intent and apply OS-specific wiring while preserving the contract's machine-local scope and restore-entrypoint target.
 
-Current shipped installer coverage is `win32` via Task Scheduler, `linux` via user systemd, and `darwin` via launchd; remaining deferred startup installers are still-unregistered platforms.
+Current shipped installer coverage is `win32` via Task Scheduler, `linux` via user systemd, `darwin` via launchd, and `freebsd` via rc.d; remaining deferred startup installers are still-unregistered platforms.

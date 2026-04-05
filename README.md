@@ -145,7 +145,8 @@ Current merged Wave 2 startup-contract behavior:
 - Current Windows (`win32`) behavior uses a real Task Scheduler backend (`windows-task-scheduler`) in default CLI backend selection.
 - Current Linux (`linux`) behavior uses a real user-systemd backend (`systemd-user`) in default CLI backend selection.
 - Current macOS (`darwin`) behavior uses a real launchd LaunchAgent backend (`launchd-agent`) in default CLI backend selection.
-- Unsupported contract fallback (`contract-only`) is still used for platforms without a registered backend (for example, BSD variants).
+- Current FreeBSD (`freebsd`) behavior uses a real rc.d backend (`freebsd-rc.d`) that installs `lifeline_restore` and enables it via `/etc/rc.conf.d/lifeline_restore`.
+- Unsupported contract fallback (`contract-only`) is still used for platforms without a registered backend (for example, OpenBSD and NetBSD).
 
 When the active backend is unsupported, startup status reports mechanism (`contract-only`) so fallback behavior stays explicit.
 
@@ -161,7 +162,7 @@ Startup backend status: <installed|not-installed|unsupported>
 - detail: <backend/status detail>
 ```
 
-For unsupported backends, status and mutation detail must remain explicit (for example, `No startup installer backend is available on freebsd yet.`) so startup state is not tribal knowledge.
+For unsupported backends, status and mutation detail must remain explicit (for example, `No startup installer backend is available on openbsd yet.`) so startup state is not tribal knowledge.
 
 ## Slim manifest example with Playbook defaults
 
@@ -330,4 +331,4 @@ Expected interaction with `restore` stays explicit: startup registration contrac
 
 ## Wave 1 notes
 
-Wave 1 added a supervisor-backed lifecycle plus restore semantics. Wave 2 now includes the startup contract/CLI surface plus default `win32` Task Scheduler, `linux` user-systemd, and `darwin` launchd backend wiring; remaining deferred installers are still-unregistered platforms behind the same seam.
+Wave 1 added a supervisor-backed lifecycle plus restore semantics. Wave 2 now includes the startup contract/CLI surface plus default `win32` Task Scheduler, `linux` user-systemd, `darwin` launchd, and `freebsd` rc.d backend wiring; remaining deferred installers are still-unregistered platforms behind the same seam.

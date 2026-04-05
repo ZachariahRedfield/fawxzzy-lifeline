@@ -201,15 +201,89 @@ async function verifyBackendResolutionCoverageAndFallback() {
   assert(win32Backend.id === 'windows-task-scheduler', `Expected win32 backend to resolve to windows-task-scheduler, got ${win32Backend.id}.`);
 
   const freebsdBackend = resolveStartupBackend({ platform: 'freebsd' });
-  const fallbackInspection = await freebsdBackend.inspect();
+  assert(freebsdBackend.id === 'freebsd-rc.d', `Expected freebsd backend to resolve to freebsd-rc.d, got ${freebsdBackend.id}.`);
+
+  const unknownBackend = resolveStartupBackend({ platform: 'openbsd' });
+  const fallbackInspection = await unknownBackend.inspect();
   assert(fallbackInspection.supported === false, 'Expected unsupported fallback backend to report supported=false.');
   assert(fallbackInspection.mechanism === 'contract-only', `Expected contract-only mechanism, got ${fallbackInspection.mechanism}.`);
   assert(
-    fallbackInspection.detail.includes('No startup installer backend is available on freebsd yet.'),
+    fallbackInspection.detail.includes('No startup installer backend is available on openbsd yet.'),
     `Expected unsupported inspection detail to include platform name, got: ${fallbackInspection.detail}`,
   );
 }
 
+
+async function verifyFreebsdRcDBackendDeterministicBehavior() {
+  await ensureBuiltCli();
+
+  const { mkdtemp, readFile } = await import('node:fs/promises');
+  const startupBackendFreebsdModule = await import(new URL('../dist/core/startup-backends/freebsd-rcd.js', import.meta.url));
+  const { createFreebsdRcDBackend } = startupBackendFreebsdModule;
+
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'lifeline-freebsd-backend-'));
+  const rcDDirectory = path.join(tempRoot, 'usr', 'local', 'etc', 'rc.d');
+  const rcConfDirectory = path.join(tempRoot, 'etc', 'rc.conf.d');
+
+  const backend = createFreebsdRcDBackend({ rcDDirectory, rcConfDirectory });
+
+  const dryRunInstall = await backend.install({
+    scope: 'machine-local',
+    restoreEntrypoint: 'lifeline restore',
+    dryRun: true,
+  });
+  assert(dryRunInstall.status === 'not-installed', `Expected FreeBSD dry-run install status not-installed, got ${dryRunInstall.status}.`);
+  assert(
+    dryRunInstall.detail.includes('would write') && dryRunInstall.detail.includes('lifeline_restore'),
+    `Expected FreeBSD dry-run install detail to describe rc.d intent, got: ${dryRunInstall.detail}`
+  );
+
+  const installResult = await backend.install({
+    scope: 'machine-local',
+    restoreEntrypoint: 'lifeline restore',
+    dryRun: false,
+  });
+  assert(installResult.status === 'installed', `Expected FreeBSD install status installed, got ${installResult.status}.`);
+
+  const scriptPath = path.join(rcDDirectory, 'lifeline_restore');
+  const rcConfPath = path.join(rcConfDirectory, 'lifeline_restore');
+  const scriptContents = await readFile(scriptPath, 'utf8');
+  const rcConfContents = await readFile(rcConfPath, 'utf8');
+  assert(
+    scriptContents.includes('lifeline restore'),
+    `Expected installed rc.d script to keep canonical restore entrypoint.\n${scriptContents}`
+  );
+  assert(
+    rcConfContents.includes('lifeline_restore_enable="YES"'),
+    `Expected installed rc.conf entry to enable startup.\n${rcConfContents}`
+  );
+
+  const inspectResult = await backend.inspect();
+  assert(inspectResult.status === 'installed', `Expected FreeBSD inspect status installed after install, got ${inspectResult.status}.`);
+
+  const dryRunUninstall = await backend.uninstall({
+    scope: 'machine-local',
+    restoreEntrypoint: 'lifeline restore',
+    dryRun: true,
+  });
+  assert(
+    dryRunUninstall.detail.includes('would remove') || dryRunUninstall.detail.includes('is not present'),
+    `Expected FreeBSD dry-run uninstall detail to describe deterministic removal intent, got: ${dryRunUninstall.detail}`
+  );
+
+  const uninstallResult = await backend.uninstall({
+    scope: 'machine-local',
+    restoreEntrypoint: 'lifeline restore',
+    dryRun: false,
+  });
+  assert(uninstallResult.status === 'not-installed', `Expected FreeBSD uninstall status not-installed, got ${uninstallResult.status}.`);
+
+  const inspectAfterUninstall = await backend.inspect();
+  assert(
+    inspectAfterUninstall.status === 'not-installed',
+    `Expected FreeBSD inspect status not-installed after uninstall, got ${inspectAfterUninstall.status}.`
+  );
+}
 
 async function verifyLaunchdBackendDeterministicBehavior() {
   await ensureBuiltCli();
@@ -390,6 +464,7 @@ async function main() {
   await verifyContractSurfaceWiring();
   await verifySeamInstallDisableStatusAndDryRun();
   await verifyBackendResolutionCoverageAndFallback();
+  await verifyFreebsdRcDBackendDeterministicBehavior();
   await verifyLaunchdBackendDeterministicBehavior();
   await verifySystemdBackendDeterministicBehavior();
   console.log('Wave 2 startup deterministic verification passed.');

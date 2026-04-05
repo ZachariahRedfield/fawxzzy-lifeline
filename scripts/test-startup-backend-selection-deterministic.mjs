@@ -36,6 +36,24 @@ async function verifyLinuxDefaultSelection() {
   );
 }
 
+async function verifyFreebsdDefaultSelection() {
+  const backend = resolveStartupBackend({ platform: 'freebsd' });
+  const inspection = await backend.inspect();
+
+  assert(
+    backend.id === 'freebsd-rc.d',
+    `Expected freebsd-rc.d backend id for freebsd, got ${backend.id}.`,
+  );
+  assert(
+    inspection.mechanism === 'freebsd-rc.d',
+    `Expected freebsd-rc.d mechanism for freebsd, got ${inspection.mechanism}.`,
+  );
+  assert(
+    ['installed', 'not-installed'].includes(inspection.status),
+    `Expected freebsd inspection status to be installed|not-installed, got ${inspection.status}.`,
+  );
+}
+
 async function verifyUnsupportedDefaultSelection(platform) {
   const backend = resolveStartupBackend({ platform });
   const inspection = await backend.inspect();
@@ -130,7 +148,8 @@ async function main() {
   );
   await verifyDarwinDefaultSelection();
   await verifyLinuxDefaultSelection();
-  await verifyUnsupportedDefaultSelection('freebsd');
+  await verifyFreebsdDefaultSelection();
+  await verifyUnsupportedDefaultSelection('openbsd');
   await verifyInjectedBackendSelection();
   await verifyRegistrySelectionAndFallback();
   console.log('Deterministic startup backend selection verification passed.');
