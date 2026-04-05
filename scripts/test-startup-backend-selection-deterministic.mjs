@@ -54,6 +54,42 @@ async function verifyFreebsdDefaultSelection() {
   );
 }
 
+async function verifyOpenbsdDefaultSelection() {
+  const backend = resolveStartupBackend({ platform: 'openbsd' });
+  const inspection = await backend.inspect();
+
+  assert(
+    backend.id === 'openbsd-rcctl',
+    `Expected openbsd-rcctl backend id for openbsd, got ${backend.id}.`,
+  );
+  assert(
+    inspection.mechanism === 'openbsd-rcctl',
+    `Expected openbsd-rcctl mechanism for openbsd, got ${inspection.mechanism}.`,
+  );
+  assert(
+    ['installed', 'not-installed', 'unsupported'].includes(inspection.status),
+    `Expected openbsd inspection status to be installed|not-installed|unsupported, got ${inspection.status}.`,
+  );
+}
+
+async function verifyNetbsdDefaultSelection() {
+  const backend = resolveStartupBackend({ platform: 'netbsd' });
+  const inspection = await backend.inspect();
+
+  assert(
+    backend.id === 'netbsd-rc.d',
+    `Expected netbsd-rc.d backend id for netbsd, got ${backend.id}.`,
+  );
+  assert(
+    inspection.mechanism === 'netbsd-rc.d',
+    `Expected netbsd-rc.d mechanism for netbsd, got ${inspection.mechanism}.`,
+  );
+  assert(
+    ['installed', 'not-installed'].includes(inspection.status),
+    `Expected netbsd inspection status to be installed|not-installed, got ${inspection.status}.`,
+  );
+}
+
 async function verifyUnsupportedDefaultSelection(platform) {
   const backend = resolveStartupBackend({ platform });
   const inspection = await backend.inspect();
@@ -149,7 +185,9 @@ async function main() {
   await verifyDarwinDefaultSelection();
   await verifyLinuxDefaultSelection();
   await verifyFreebsdDefaultSelection();
-  await verifyUnsupportedDefaultSelection('openbsd');
+  await verifyOpenbsdDefaultSelection();
+  await verifyNetbsdDefaultSelection();
+  await verifyUnsupportedDefaultSelection('aix');
   await verifyInjectedBackendSelection();
   await verifyRegistrySelectionAndFallback();
   console.log('Deterministic startup backend selection verification passed.');

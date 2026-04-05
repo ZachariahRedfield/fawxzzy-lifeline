@@ -1,5 +1,7 @@
 import { createFreebsdRcDBackend } from "./startup-backends/freebsd-rcd.js";
 import { createLaunchdBackend } from "./startup-backends/launchd.js";
+import { createNetbsdRcDBackend } from "./startup-backends/netbsd-rcd.js";
+import { createOpenbsdRcctlBackend } from "./startup-backends/openbsd-rcctl.js";
 import { createSystemdUserBackend } from "./startup-backends/systemd.js";
 import { createWindowsTaskSchedulerBackend } from "./startup-backends/windows-task-scheduler.js";
 
@@ -44,6 +46,8 @@ const DEFAULT_STARTUP_BACKEND_REGISTRY: StartupBackendRegistry = {
     darwin: () => createLaunchdBackend(),
     freebsd: () => createFreebsdRcDBackend(),
     linux: () => createSystemdUserBackend(),
+    netbsd: () => createNetbsdRcDBackend(),
+    openbsd: () => createOpenbsdRcctlBackend(),
     win32: () => createWindowsTaskSchedulerBackend(),
   },
 };
