@@ -1,6 +1,6 @@
 # Startup contract (merged Wave 2)
 
-Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior. This document tracks the contract boundary and current runtime behavior, including current Windows Task Scheduler support, Linux user-systemd support, macOS launchd support, FreeBSD rc.d support, OpenBSD rcctl support, NetBSD rc.d support, and unsupported-platform fallback behavior.
+Merged Wave 2 defines Lifeline's startup-registration seam and deterministic CLI/state behavior. This document tracks the contract boundary and current runtime behavior, including current Windows Task Scheduler support, Linux user-systemd support, macOS launchd support, FreeBSD rc.d support, OpenBSD rcctl support, NetBSD rc.d support, AIX inittab support, and unsupported-platform fallback behavior.
 
 ## Scope
 
@@ -123,13 +123,24 @@ Behavior:
 - `startup status` inspects those same files to verify canonical `lifeline restore` wiring and reports install state via `netbsd-rc.d` mechanism.
 - Install/uninstall may fail without write access to system startup paths; backend detail remains explicit when that occurs.
 
+## AIX backend status (current)
+
+As of April 5, 2026, default `aix` backend resolution selects the `aix-inittab` backend in normal CLI flow.
+
+Behavior:
+
+- `startup enable` creates or updates AIX inittab entry `llrestore` using `mkitab`/`chitab` so startup targets `lifeline restore`.
+- `startup disable` removes the same inittab entry with `rmitab`.
+- `startup status` inspects the same entry via `lsitab llrestore` and reports install state via `aix-inittab` mechanism when canonical restore wiring is present.
+- If AIX inittab tooling is unavailable, backend detail is explicit and readiness resolves to `unsupported`.
+
 ## Unsupported platform behavior (current)
 
-Platforms without a registered installer backend currently resolve to the `unsupported` backend (for example, `aix`):
+Platforms without a registered installer backend currently resolve to the `unsupported` backend (for example, `sunos`):
 
 - mechanism is `contract-only`
 - status is `unsupported`
-- detail includes the concrete platform name (for example, `No startup installer backend is available on aix yet.`)
+- detail includes the concrete platform name (for example, `No startup installer backend is available on sunos yet.`)
 - startup intent still persists in `.lifeline/startup.json` for future backend availability
 
 ## Restore entrypoint wiring
@@ -153,4 +164,4 @@ No platform-specific registration identifiers are persisted in this slice.
 
 Future platform installers must plug into this contract, not bypass it. Backends should read the contract intent and apply OS-specific wiring while preserving the contract's machine-local scope and restore-entrypoint target.
 
-Current shipped installer coverage is `win32` via Task Scheduler, `linux` via user systemd, `darwin` via launchd, `freebsd` via rc.d, `openbsd` via rcctl, and `netbsd` via rc.d; remaining deferred startup installers are still-unregistered platforms.
+Current shipped installer coverage is `win32` via Task Scheduler, `linux` via user systemd, `darwin` via launchd, `freebsd` via rc.d, `openbsd` via rcctl, `netbsd` via rc.d, and `aix` via inittab; remaining deferred startup installers are still-unregistered platforms.

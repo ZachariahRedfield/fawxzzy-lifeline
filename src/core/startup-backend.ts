@@ -1,3 +1,4 @@
+import { createAixInittabBackend } from "./startup-backends/aix-inittab.js";
 import { createFreebsdRcDBackend } from "./startup-backends/freebsd-rcd.js";
 import { createLaunchdBackend } from "./startup-backends/launchd.js";
 import { createNetbsdRcDBackend } from "./startup-backends/netbsd-rcd.js";
@@ -5,7 +6,10 @@ import { createOpenbsdRcctlBackend } from "./startup-backends/openbsd-rcctl.js";
 import { createSystemdUserBackend } from "./startup-backends/systemd.js";
 import { createWindowsTaskSchedulerBackend } from "./startup-backends/windows-task-scheduler.js";
 
-export type StartupBackendStatus = "installed" | "not-installed" | "unsupported";
+export type StartupBackendStatus =
+  | "installed"
+  | "not-installed"
+  | "unsupported";
 export type RuntimePlatform = string;
 export type StartupBackendCapability = "inspect" | "install" | "uninstall";
 
@@ -43,6 +47,7 @@ export interface StartupBackendRegistry {
 
 const DEFAULT_STARTUP_BACKEND_REGISTRY: StartupBackendRegistry = {
   byPlatform: {
+    aix: () => createAixInittabBackend(),
     darwin: () => createLaunchdBackend(),
     freebsd: () => createFreebsdRcDBackend(),
     linux: () => createSystemdUserBackend(),
@@ -54,7 +59,8 @@ const DEFAULT_STARTUP_BACKEND_REGISTRY: StartupBackendRegistry = {
 
 function createUnsupportedBackend(platform: RuntimePlatform): StartupBackend {
   const detail = `No startup installer backend is available on ${platform} yet.`;
-  const contractFallbackDetail = "Falling back to contract-only startup behavior.";
+  const contractFallbackDetail =
+    "Falling back to contract-only startup behavior.";
 
   return {
     id: "unsupported",
@@ -86,7 +92,9 @@ export interface StartupBackendResolutionOptions {
   registry?: StartupBackendRegistry;
 }
 
-export function resolveStartupBackend(options: StartupBackendResolutionOptions = {}): StartupBackend {
+export function resolveStartupBackend(
+  options: StartupBackendResolutionOptions = {},
+): StartupBackend {
   if (options.backend) {
     return options.backend;
   }

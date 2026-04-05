@@ -43,6 +43,7 @@
     "test-runtime-state-invalid-shape-deterministic.mjs",
     "test-runtime-state-malformed-deterministic.mjs",
     "test-startup-backend-selection-deterministic.mjs",
+    "test-startup-aix-deterministic.mjs",
     "test-startup-state-atomic-write-deterministic.mjs",
     "test-startup-state-invalid-shape-deterministic.mjs",
     "test-startup-windows-task-scheduler-harness-deterministic.mjs",
