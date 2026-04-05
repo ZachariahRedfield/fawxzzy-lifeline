@@ -31,6 +31,7 @@ Status output shape (deterministic):
 Startup supported: <yes|no>
 Startup enabled: <yes|no>
 Startup backend status: <installed|not-installed|unsupported>
+- backend: <backend id>
 - mechanism: <backend mechanism>
 - scope: machine-local
 - restore entrypoint: lifeline restore
