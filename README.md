@@ -149,6 +149,7 @@ Current merged Wave 2 startup-contract behavior:
 - Current OpenBSD (`openbsd`) behavior uses a real rcctl backend (`openbsd-rcctl`) that writes `/etc/rc.d/lifeline_restore`, sets `rcctl` flags to `restore`, and enables `lifeline_restore`.
 - Current NetBSD (`netbsd`) behavior uses a real rc.d backend (`netbsd-rc.d`) that writes `/etc/rc.d/lifeline_restore` and enables it via `/etc/rc.conf.d/lifeline_restore`.
 - Current AIX (`aix`) behavior uses a real inittab backend (`aix-inittab`) that manages a canonical `llrestore` inittab entry to run `lifeline restore` at startup.
+- AIX startup registration assumes `lsitab`/`mkitab`/`chitab`/`rmitab` are available and writable for `/etc/inittab`; when those tools are unavailable or permission is insufficient, status and mutation details remain explicit from the backend seam.
 - Unsupported contract fallback (`contract-only`) is still used for platforms without a registered backend (for example, SunOS).
 
 When the active backend is unsupported, startup status reports mechanism (`contract-only`) so fallback behavior stays explicit.

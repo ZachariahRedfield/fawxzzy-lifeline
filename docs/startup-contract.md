@@ -133,6 +133,7 @@ Behavior:
 - `startup disable` removes the same inittab entry with `rmitab`.
 - `startup status` inspects the same entry via `lsitab llrestore` and reports install state via `aix-inittab` mechanism when canonical restore wiring is present.
 - If AIX inittab tooling is unavailable, backend detail is explicit and readiness resolves to `unsupported`.
+- Install/uninstall are machine-local system mutations and may require elevated privileges to write `/etc/inittab`; dry-run remains non-mutating and reports the same planned inittab action.
 
 ## Unsupported platform behavior (current)
 
