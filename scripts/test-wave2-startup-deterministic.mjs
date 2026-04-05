@@ -203,12 +203,18 @@ async function verifyBackendResolutionCoverageAndFallback() {
   const freebsdBackend = resolveStartupBackend({ platform: 'freebsd' });
   assert(freebsdBackend.id === 'freebsd-rc.d', `Expected freebsd backend to resolve to freebsd-rc.d, got ${freebsdBackend.id}.`);
 
-  const unknownBackend = resolveStartupBackend({ platform: 'openbsd' });
+  const openbsdBackend = resolveStartupBackend({ platform: 'openbsd' });
+  assert(openbsdBackend.id === 'openbsd-rcctl', `Expected openbsd backend to resolve to openbsd-rcctl, got ${openbsdBackend.id}.`);
+
+  const netbsdBackend = resolveStartupBackend({ platform: 'netbsd' });
+  assert(netbsdBackend.id === 'netbsd-rc.d', `Expected netbsd backend to resolve to netbsd-rc.d, got ${netbsdBackend.id}.`);
+
+  const unknownBackend = resolveStartupBackend({ platform: 'aix' });
   const fallbackInspection = await unknownBackend.inspect();
   assert(fallbackInspection.supported === false, 'Expected unsupported fallback backend to report supported=false.');
   assert(fallbackInspection.mechanism === 'contract-only', `Expected contract-only mechanism, got ${fallbackInspection.mechanism}.`);
   assert(
-    fallbackInspection.detail.includes('No startup installer backend is available on openbsd yet.'),
+    fallbackInspection.detail.includes('No startup installer backend is available on aix yet.'),
     `Expected unsupported inspection detail to include platform name, got: ${fallbackInspection.detail}`,
   );
 }
