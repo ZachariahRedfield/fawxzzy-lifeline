@@ -16,11 +16,28 @@ function parseStringLiteralUnion(source, typeName) {
   return values;
 }
 
+function parseDefaultStartupRegistryPlatforms(source) {
+  const registryBlockMatch = source.match(
+    /DEFAULT_STARTUP_BACKEND_REGISTRY:[\s\S]*?byPlatform:\s*{([\s\S]*?)\n\s*},\n};/,
+  );
+  assert(
+    registryBlockMatch,
+    "Could not parse DEFAULT_STARTUP_BACKEND_REGISTRY.byPlatform from startup backend source.",
+  );
+
+  const platforms = [...registryBlockMatch[1].matchAll(/^\s*([a-z0-9_-]+)\s*:/gm)].map(
+    (entry) => entry[1],
+  );
+  assert(platforms.length > 0, "Startup backend registry platform list appears empty.");
+  return platforms;
+}
+
 async function main() {
   const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
-  const [startupSource, startupDocs, readme] = await Promise.all([
+  const [startupSource, startupBackendSource, startupDocs, readme] = await Promise.all([
     readFile(path.join(repoRoot, 'src/core/startup-contract.ts'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/core/startup-backend.ts'), 'utf8'),
     readFile(path.join(repoRoot, 'docs/startup-contract.md'), 'utf8'),
     readFile(path.join(repoRoot, 'README.md'), 'utf8'),
   ]);
@@ -30,6 +47,18 @@ async function main() {
   const restoreEntrypoint = 'lifeline restore';
   const backendStatus = 'not-installed';
   const startupIntents = parseStringLiteralUnion(startupSource, 'StartupIntent');
+  const registryPlatforms = parseDefaultStartupRegistryPlatforms(startupBackendSource);
+
+  for (const platform of registryPlatforms) {
+    assert(
+      startupDocs.includes(`\`${platform}\``),
+      `docs/startup-contract.md must list startup backend registry platform \`${platform}\`.`,
+    );
+    assert(
+      readme.includes(`\`${platform}\``),
+      `README.md must list startup backend registry platform \`${platform}\`.`,
+    );
+  }
 
   for (const action of actions) {
     assert(
