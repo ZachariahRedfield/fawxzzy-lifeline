@@ -59,7 +59,7 @@ Once a platform backend lands, this document and deterministic startup verificat
 
 ## Default backend registry coverage (current)
 
-As of April 5, 2026, `src/core/startup-backend.ts` registers real startup backends for:
+`src/core/startup-backend.ts` currently registers real startup backends for:
 
 - `aix` → `aix-inittab`
 - `darwin` → `launchd-agent`
@@ -73,7 +73,7 @@ Any non-registered platform resolves to the explicit `unsupported` contract-only
 
 ## Windows backend status (current)
 
-As of April 5, 2026, default `win32` backend resolution selects the `windows-task-scheduler` backend in normal CLI flow.
+Default `win32` backend resolution selects the `windows-task-scheduler` backend in normal CLI flow.
 
 Behavior:
 
@@ -85,7 +85,7 @@ Behavior:
 
 ## Linux backend status (current)
 
-As of April 5, 2026, default `linux` backend resolution selects the `systemd-user` backend in normal CLI flow.
+Default `linux` backend resolution selects the `systemd-user` backend in normal CLI flow.
 
 Behavior:
 
@@ -96,7 +96,7 @@ Behavior:
 
 ## macOS backend status (current)
 
-As of April 5, 2026, default `darwin` backend resolution selects the `launchd-agent` backend in normal CLI flow.
+Default `darwin` backend resolution selects the `launchd-agent` backend in normal CLI flow.
 
 Behavior:
 
@@ -107,7 +107,7 @@ Behavior:
 
 ## FreeBSD backend status (current)
 
-As of April 5, 2026, default `freebsd` backend resolution selects the `freebsd-rc.d` backend in normal CLI flow.
+Default `freebsd` backend resolution selects the `freebsd-rc.d` backend in normal CLI flow.
 
 Behavior:
 
@@ -118,7 +118,7 @@ Behavior:
 
 ## OpenBSD backend status (current)
 
-As of April 5, 2026, default `openbsd` backend resolution selects the `openbsd-rcctl` backend in normal CLI flow.
+Default `openbsd` backend resolution selects the `openbsd-rcctl` backend in normal CLI flow.
 
 Behavior:
 
@@ -129,7 +129,7 @@ Behavior:
 
 ## NetBSD backend status (current)
 
-As of April 5, 2026, default `netbsd` backend resolution selects the `netbsd-rc.d` backend in normal CLI flow.
+Default `netbsd` backend resolution selects the `netbsd-rc.d` backend in normal CLI flow.
 
 Behavior:
 
@@ -140,7 +140,7 @@ Behavior:
 
 ## AIX backend status (current)
 
-As of April 5, 2026, default `aix` backend resolution selects the `aix-inittab` backend in normal CLI flow.
+Default `aix` backend resolution selects the `aix-inittab` backend in normal CLI flow.
 
 Behavior:
 

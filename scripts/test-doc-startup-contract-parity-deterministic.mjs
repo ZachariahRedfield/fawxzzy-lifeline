@@ -35,10 +35,11 @@ function parseDefaultStartupRegistryPlatforms(source) {
 async function main() {
   const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
-  const [startupSource, startupBackendSource, startupDocs, readme] = await Promise.all([
+  const [startupSource, startupBackendSource, startupDocs, architectureDocs, readme] = await Promise.all([
     readFile(path.join(repoRoot, 'src/core/startup-contract.ts'), 'utf8'),
     readFile(path.join(repoRoot, 'src/core/startup-backend.ts'), 'utf8'),
     readFile(path.join(repoRoot, 'docs/startup-contract.md'), 'utf8'),
+    readFile(path.join(repoRoot, 'docs/architecture.md'), 'utf8'),
     readFile(path.join(repoRoot, 'README.md'), 'utf8'),
   ]);
 
@@ -57,6 +58,11 @@ async function main() {
     assert(
       readme.includes(`\`${platform}\``),
       `README.md must list startup backend registry platform \`${platform}\`.`,
+    );
+
+    assert(
+      architectureDocs.includes(`\`${platform}\``),
+      `docs/architecture.md must list startup backend registry platform \`${platform}\`.`,
     );
   }
 
@@ -80,7 +86,7 @@ async function main() {
     'README.md must document --dry-run support for startup enable/disable.',
   );
 
-  for (const surface of [startupSource, startupDocs, readme]) {
+  for (const surface of [startupSource, startupDocs, architectureDocs, readme]) {
     assert(
       surface.includes(scope),
       `Startup contract parity drift: missing scope value \`${scope}\` in one startup contract surface.`,
@@ -130,8 +136,8 @@ async function main() {
   );
 
   assert(
-    startupDocs.includes('contract-only') && readme.includes('contract-only'),
-    'Startup docs and README must both explain contract-only startup behavior.',
+    startupDocs.includes('contract-only') && architectureDocs.includes('contract-only') && readme.includes('contract-only'),
+    'Startup docs, architecture docs, and README must all explain contract-only startup behavior.',
   );
 
   assert(
