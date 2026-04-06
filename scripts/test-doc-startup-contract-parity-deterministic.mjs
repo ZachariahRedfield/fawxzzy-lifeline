@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,16 +32,49 @@ function parseDefaultStartupRegistryPlatforms(source) {
   return platforms;
 }
 
+function parseStartupBackendImports(source) {
+  const imports = [...source.matchAll(/from "\.\/startup-backends\/([^"]+)\.js";/g)].map(
+    (entry) => entry[1],
+  );
+  assert(imports.length > 0, "Startup backend source appears to have no startup-backends imports.");
+  return imports;
+}
+
 async function main() {
   const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
-  const [startupSource, startupBackendSource, startupDocs, architectureDocs, readme] = await Promise.all([
+  const startupBackendsDir = path.join(repoRoot, 'src/core/startup-backends');
+  const [
+    startupSource,
+    startupBackendSource,
+    startupDocs,
+    architectureDocs,
+    readme,
+    startupBackendsDirEntries,
+  ] = await Promise.all([
     readFile(path.join(repoRoot, 'src/core/startup-contract.ts'), 'utf8'),
     readFile(path.join(repoRoot, 'src/core/startup-backend.ts'), 'utf8'),
     readFile(path.join(repoRoot, 'docs/startup-contract.md'), 'utf8'),
     readFile(path.join(repoRoot, 'docs/architecture.md'), 'utf8'),
     readFile(path.join(repoRoot, 'README.md'), 'utf8'),
+    readdir(startupBackendsDir),
   ]);
+  const startupBackendImports = parseStartupBackendImports(startupBackendSource);
+  const startupBackendTsFiles = startupBackendsDirEntries
+    .filter((entry) => entry.endsWith('.ts'))
+    .map((entry) => entry.replace(/\.ts$/, ''));
+
+  assert(
+    startupBackendImports.length === startupBackendTsFiles.length,
+    `Startup backend import/file count mismatch: startup-backend.ts imports ${startupBackendImports.length} backend modules, but src/core/startup-backends has ${startupBackendTsFiles.length} TypeScript backend files.`,
+  );
+
+  for (const backendImport of startupBackendImports) {
+    assert(
+      startupBackendTsFiles.includes(backendImport),
+      `startup-backend.ts imports startup backend "${backendImport}" that does not exist in src/core/startup-backends/*.ts.`,
+    );
+  }
 
   const actions = ['status', 'enable', 'disable'];
   const scope = 'machine-local';
