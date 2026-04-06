@@ -180,4 +180,4 @@ No platform-specific registration identifiers are persisted in this slice.
 
 Future platform installers must plug into this contract, not bypass it. Backends should read the contract intent and apply OS-specific wiring while preserving the contract's machine-local scope and restore-entrypoint target.
 
-Current shipped installer coverage is `win32` via Task Scheduler, `linux` via user systemd, `darwin` via launchd, `freebsd` via rc.d, `openbsd` via rcctl, `netbsd` via rc.d, and `aix` via inittab; remaining deferred startup installers are still-unregistered platforms.
+Current shipped installer coverage is `win32` via Task Scheduler, `linux` via user systemd, `darwin` via launchd, `freebsd` via rc.d, `openbsd` via rcctl, `netbsd` via rc.d, and `aix` via inittab; remaining startup installers for unregistered platforms.

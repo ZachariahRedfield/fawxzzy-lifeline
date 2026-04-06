@@ -336,4 +336,4 @@ Expected interaction with `restore` stays explicit: startup registration contrac
 
 ## Wave 1 notes
 
-Wave 1 added a supervisor-backed lifecycle plus restore semantics. Wave 2 now includes the startup contract/CLI surface plus default `win32` Task Scheduler, `linux` user-systemd, `darwin` launchd, `freebsd` rc.d, `openbsd` rcctl, `netbsd` rc.d, and `aix` inittab backend wiring; remaining deferred installers are still-unregistered platforms behind the same seam.
+Wave 1 added a supervisor-backed lifecycle plus restore semantics. Wave 2 now includes the startup contract/CLI surface plus default `win32` Task Scheduler, `linux` user-systemd, `darwin` launchd, `freebsd` rc.d, `openbsd` rcctl, `netbsd` rc.d, and `aix` inittab backend wiring; remaining installers for unregistered platforms stay behind the same seam.
