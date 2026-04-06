@@ -32,6 +32,18 @@ function parseDefaultStartupRegistryPlatforms(source) {
   return platforms;
 }
 
+function parseBacktickedValues(markdown, heading) {
+  const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sectionMatch = markdown.match(
+    new RegExp(`## ${escapedHeading}[\\s\\S]*?(?=\\n## |$)`),
+  );
+  assert(sectionMatch, `Could not find docs section "## ${heading}".`);
+
+  return [
+    ...sectionMatch[0].matchAll(/- `([a-z0-9_-]+)`/g),
+  ].map((entry) => entry[1]);
+}
+
 function parseStartupBackendImports(source) {
   const imports = [...source.matchAll(/from "\.\/startup-backends\/([^"]+)\.js";/g)].map(
     (entry) => entry[1],
@@ -82,6 +94,14 @@ async function main() {
   const backendStatus = 'not-installed';
   const startupIntents = parseStringLiteralUnion(startupSource, 'StartupIntent');
   const registryPlatforms = parseDefaultStartupRegistryPlatforms(startupBackendSource);
+  const architecturePlatforms = parseBacktickedValues(
+    architectureDocs,
+    "Startup backend boundary",
+  );
+  const startupDocPlatforms = parseBacktickedValues(
+    startupDocs,
+    "Default backend registry coverage (current)",
+  );
 
   for (const platform of registryPlatforms) {
     assert(
@@ -98,6 +118,18 @@ async function main() {
       `docs/architecture.md must list startup backend registry platform \`${platform}\`.`,
     );
   }
+
+  const sortedRegistryPlatforms = [...registryPlatforms].sort();
+  const sortedArchitecturePlatforms = [...architecturePlatforms].sort();
+  const sortedStartupDocPlatforms = [...startupDocPlatforms].sort();
+  assert(
+    JSON.stringify(sortedArchitecturePlatforms) === JSON.stringify(sortedRegistryPlatforms),
+    `docs/architecture.md startup backend list must exactly match src/core/startup-backend.ts registry platforms (${sortedRegistryPlatforms.join(", ")}).`,
+  );
+  assert(
+    JSON.stringify(sortedStartupDocPlatforms) === JSON.stringify(sortedRegistryPlatforms),
+    `docs/startup-contract.md startup backend list must exactly match src/core/startup-backend.ts registry platforms (${sortedRegistryPlatforms.join(", ")}).`,
+  );
 
   for (const action of actions) {
     assert(
@@ -171,6 +203,14 @@ async function main() {
   assert(
     startupDocs.includes('contract-only') && architectureDocs.includes('contract-only') && readme.includes('contract-only'),
     'Startup docs, architecture docs, and README must all explain contract-only startup behavior.',
+  );
+  assert(
+    startupDocs.includes('Any non-registered platform resolves to the explicit `unsupported` contract-only fallback backend.'),
+    'docs/startup-contract.md must explicitly document unsupported fallback for unregistered platforms.',
+  );
+  assert(
+    readme.includes('any other platform still resolves through the explicit `contract-only` unsupported fallback'),
+    'README.md must explicitly document unsupported fallback for unregistered platforms.',
   );
 
   assert(
